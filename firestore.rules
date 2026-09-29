@@ -1,0 +1,159 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function orgIdOf(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId)).data.orgId;
+    }
+
+    function isOrgMember(eventId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/organizations/$(orgIdOf(eventId))/members/$(request.auth.uid));
+    }
+
+    function isOrgOwner(orgId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'owner';
+    }
+
+    function teamRepDoc(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId)/teamReps/$(request.auth.uid));
+    }
+
+    function isTeamRepFor(eventId, teamId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/events/$(eventId)/teamReps/$(request.auth.uid)) &&
+        teamRepDoc(eventId).data.teamId == teamId;
+    }
+
+    // The signed-in account's email (lowercased), if it has one. Anonymous accounts have none.
+    function hasAuthEmail() {
+      return isSignedIn() && 'email' in request.auth.token;
+    }
+
+    function authEmailLower() {
+      return request.auth.token.email.lower();
+    }
+
+    // ---------- Users (uid -> orgId lookup, one row per account) ----------
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ---------- Organizations ----------
+    match /organizations/{orgId} {
+      allow read: if isSignedIn() &&
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+      allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if isOrgOwner(orgId);
+
+      match /members/{uid} {
+        allow read: if isSignedIn() &&
+          exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+        // Bootstrap: a user may create their own OWNER membership doc only when they also
+        // own the parent org doc (both writes happen in one client-side batch on sign-up).
+        allow create: if isSignedIn() && request.auth.uid == uid &&
+          get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerUid == request.auth.uid;
+        allow update, delete: if isOrgOwner(orgId);
+      }
+    }
+
+    // ---------- Events (and everything scoped to one event) ----------
+    match /events/{eventId} {
+      allow read: if true; // public event landing, registration, spectator views
+      allow create: if isSignedIn() &&
+        exists(/databases/$(database)/documents/organizations/$(request.resource.data.orgId)/members/$(request.auth.uid));
+      allow update, delete: if isOrgMember(eventId);
+
+      match /sports/{sportId} {
+        allow read: if true;
+        allow write: if isOrgMember(eventId);
+      }
+
+      match /teams/{teamId} {
+        allow read: if true;
+        allow create, delete: if isOrgMember(eventId);
+        // Organizers manage the team doc; the only field a team rep may ever touch directly
+        // is purseRemaining, and only via the confirmSold transaction path.
+        allow update: if isOrgMember(eventId) ||
+          (isTeamRepFor(eventId, teamId) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['purseRemaining']));
+      }
+
+      match /registrations/{regId} {
+        allow read, update, delete: if isOrgMember(eventId);
+        allow create: if true; // public registration form, no login required
+      }
+
+      match /players/{playerId} {
+        allow read: if true;
+        allow write: if isOrgMember(eventId);
+      }
+
+      // Email, phone and address of each player. Organizers manage it; a player can read only the
+      // record whose email matches their own login (that is how they find their player record).
+      match /playerPrivate/{playerId} {
+        allow read: if isOrgMember(eventId) ||
+          (hasAuthEmail() && resource.data.emailLower == authEmailLower());
+        allow write: if isOrgMember(eventId);
+      }
+
+      // A login linked to an approved player. Creatable only when the account's email matches the
+      // player's private record, so nobody can attach themselves to someone else's record.
+      match /participants/{uid} {
+        allow read: if isOrgMember(eventId) || (isSignedIn() && request.auth.uid == uid);
+        allow create: if hasAuthEmail() && request.auth.uid == uid &&
+          get(/databases/$(database)/documents/events/$(eventId)/playerPrivate/$(request.resource.data.playerId)).data.emailLower
+            == authEmailLower();
+        allow delete: if isOrgMember(eventId) || (isSignedIn() && request.auth.uid == uid);
+      }
+
+      // Manual points per sport per team. Standings are public, same as the sports schedule and
+      // team list they're shown alongside -- anyone with the event link can look them up.
+      match /results/{sportId} {
+        allow read: if true;
+        allow write: if isOrgMember(eventId);
+      }
+
+      match /teamReps/{uid} {
+        allow read: if isOrgMember(eventId) || request.auth.uid == uid;
+        // Join flow: a signed-in (anonymous) user claims their own seat. PIN verification
+        // happens client-side against the team doc before this write; a dishonest client could
+        // skip that check, but can never grant itself an organizations/{orgId} membership, so
+        // the worst case is bidding as a team it wasn't invited to -- which the organizer can
+        // immediately undo by deleting this doc (kick/reset seat).
+        allow create: if isSignedIn() && request.auth.uid == uid;
+        allow update, delete: if isOrgMember(eventId) || request.auth.uid == uid;
+      }
+
+      match /auction/state {
+        allow read: if true; // every live-room view (organizer/bidder/spectator) listens here
+        allow create: if isOrgMember(eventId);
+        // Organizer: full control of status/currentPlayerId/etc.
+        // Team rep: may ONLY raise currentPrice on behalf of their own team, on a live auction,
+        // for the same player, by exactly the fields a bid touches -- nothing else.
+        allow update: if isOrgMember(eventId) ||
+          (
+            isSignedIn() &&
+            isTeamRepFor(eventId, request.resource.data.currentHighBidTeamId) &&
+            resource.data.status == 'live' &&
+            request.resource.data.status == resource.data.status &&
+            request.resource.data.currentPlayerId == resource.data.currentPlayerId &&
+            request.resource.data.currentPrice > resource.data.currentPrice &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['currentPrice', 'currentHighBidTeamId', 'currentHighBidderUid', 'version', 'updatedAt'])
+          );
+      }
+
+      match /bids/{bidId} {
+        allow read: if true;
+        allow create: if isOrgMember(eventId) || isTeamRepFor(eventId, request.resource.data.teamId);
+        allow update, delete: if false; // append-only audit trail
+      }
+    }
+  }
+}

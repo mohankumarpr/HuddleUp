@@ -4,20 +4,49 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#6366F1" />
     <meta
       name="description"
-      content="Auction Application for Fiesta Homes Annual Sports Event 24-25"
+      content="HuddleUp -- run your whole sports meet online: registration, teams, schedule, standings, and a live player auction, all in one place."
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+
+    <!--
+      Static, generic previews for link sharing (WhatsApp, Slack, Twitter/X, etc). This is a
+      client-rendered app with no server-side rendering, so crawlers that don't execute
+      JavaScript only ever see THIS markup -- a per-event page's own <title>/meta changes (see
+      useDocumentTitle) help the browser tab and history, but not these share-card previews.
+      Giving every event its own preview image/title would need server-side rendering or a
+      small edge function that serves crawlers a per-event version of this file.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="HuddleUp" />
+    <meta property="og:title" content="HuddleUp -- Run Your Sports Meet" />
+    <meta
+      property="og:description"
+      content="Registration, teams, schedule, standings, and a live player auction, all in one place."
+    />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1200&h=630&q=80" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="HuddleUp -- Run Your Sports Meet" />
+    <meta
+      name="twitter:description"
+      content="Registration, teams, schedule, standings, and a live player auction, all in one place."
+    />
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1200&h=630&q=80" />
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <link rel="stylesheet" href="%PUBLIC_URL%/css/now-ui-dashboard.min.css" />
-    <link rel="stylesheet" href="%PUBLIC_URL%/css/demo.css" />
-    
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
     <!--
       Notice the use of %PUBLIC_URL% in the tags above.
       It will be replaced with the URL of the `public` folder during the build.
@@ -27,7 +56,7 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>Fiesta Homes</title>
+    <title>HuddleUp -- Run Your Sports Meet</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

@@ -1,0 +1,33 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isRealAccount() {
+      return request.auth != null &&
+        request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function isImageUnder(maxBytes) {
+      return request.resource.size < maxBytes &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    match /orgs/{orgId}/logo/{fileName} {
+      allow read: if true;
+      allow write: if isRealAccount() && isImageUnder(3 * 1024 * 1024);
+    }
+
+    match /orgs/{orgId}/events/{eventId}/banner/{fileName} {
+      allow read: if true;
+      allow write: if isRealAccount() && isImageUnder(5 * 1024 * 1024);
+    }
+
+    // Public registration photo upload -- no login required to submit, matching the
+    // Firestore registrations/{regId} create rule.
+    match /orgs/{orgId}/events/{eventId}/registrations/{registrationId}/{fileName} {
+      allow read: if true;
+      allow create: if isImageUnder(5 * 1024 * 1024);
+      allow update, delete: if isRealAccount();
+    }
+  }
+}
