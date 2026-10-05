@@ -4,9 +4,9 @@ import { Box, Button, Container, Grid, Paper, Stack, Typography } from "@mui/mat
 import { motion } from "framer-motion";
 import BoltIcon from "@mui/icons-material/Bolt";
 import GroupsIcon from "@mui/icons-material/Groups";
-import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import SportsScoreIcon from "@mui/icons-material/SportsScore";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import LinkIcon from "@mui/icons-material/Link";
-import DevicesIcon from "@mui/icons-material/Devices";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { APP_NAME } from "../../branding";
 import Reveal from "../common/Reveal";
@@ -14,23 +14,23 @@ import GrainOverlay from "../common/GrainOverlay";
 import HeroCarousel from "./HeroCarousel";
 
 const STEPS = [
-  { title: "Create your event", desc: "Set up sports, teams, purses, and branding in minutes." },
-  { title: "Players & teams register", desc: "Share one link — players sign up with a photo, teams get a join PIN." },
-  { title: "Go live", desc: "Run the auction room; team reps bid in real time from their own devices." },
-  { title: "Track every sale", desc: "Purses, rosters, and sold prices update instantly for everyone watching." },
+  { title: "Create your event", desc: "Set up sports, teams, schedule, and purses in minutes." },
+  { title: "Open registration", desc: "Share one link — players sign up, teams get a join PIN, co-organizers pitch in." },
+  { title: "Configure & track", desc: "Sports, schedules, rosters, and standings stay live and up to date for everyone." },
+  { title: "Auction live, if you use one", desc: "Open the bidding room — team reps bid in real time from their own devices." },
 ];
 
 const FEATURES = [
   {
-    icon: <BoltIcon />,
-    title: "Real-time live bidding",
-    desc: "Every bid, purse, and sale syncs instantly across every device in the room — organizer console, team bidders, and spectators, all watching the same numbers.",
+    icon: <SportsScoreIcon />,
+    title: "One platform for the whole event",
+    desc: "Registration, teams, sports scheduling, standings, and a live auction — run every stage of your event from a single dashboard, with co-organizers alongside you.",
     big: true,
   },
-  { icon: <AccountBalanceWalletIcon />, title: "Purse-safe bidding", desc: "Teams can never bid past their remaining budget — enforced automatically." },
-  { icon: <GroupsIcon />, title: "Any sport, any format", desc: "Configure your own sports list and teams per event." },
   { icon: <LinkIcon />, title: "One-link registration", desc: "Replace paper forms and spreadsheets with a shareable page." },
-  { icon: <DevicesIcon />, title: "Works on any device", desc: "No app to install — everything runs in the browser." },
+  { icon: <GroupsIcon />, title: "Any sport, any format", desc: "Configure your own sports list and teams per event." },
+  { icon: <EmojiEventsIcon />, title: "Live standings & schedule", desc: "Scores, match records, and schedules update instantly for players and spectators." },
+  { icon: <BoltIcon />, title: "Live auction, when you need one", desc: "Purse-safe bidding that syncs instantly across every device — optional, and built in when your event needs it." },
 ];
 
 const SPORTS_GALLERY = [
@@ -78,7 +78,7 @@ export default function Home() {
             How it works
           </Typography>
           <Typography variant="h3" sx={{ mb: 7, maxWidth: 640 }}>
-            From registration to sold, in four steps
+            From registration to results, in four steps
           </Typography>
         </Reveal>
         <Box sx={{ position: "relative" }}>
@@ -134,7 +134,7 @@ export default function Home() {
               Why {APP_NAME}
             </Typography>
             <Typography variant="h3" sx={{ mb: 6, maxWidth: 640 }}>
-              Everything a live auction needs, built in
+              Everything your event needs, built in
             </Typography>
           </Reveal>
           <Box
@@ -196,7 +196,7 @@ export default function Home() {
       <Container maxWidth="lg" sx={{ py: { xs: 8, md: 12 } }}>
         <Reveal>
           <Typography variant="overline" color="primary.main" fontWeight={700}>
-            Built for any auction
+            Built for any sport
           </Typography>
           <Typography variant="h3" sx={{ mb: 6, maxWidth: 640 }}>
             Cricket, football, or your own sport — you decide
@@ -246,7 +246,7 @@ export default function Home() {
         <Container maxWidth="md" sx={{ textAlign: "center" }}>
           <Reveal>
             <Typography variant="h3" sx={{ mb: 2 }}>
-              Ready to run your auction?
+              Ready to run your next event?
             </Typography>
             <Typography variant="body1" sx={{ color: "grey.300", mb: 4 }}>
               Create your organization and your first event in under five minutes.

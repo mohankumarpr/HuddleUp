@@ -26,6 +26,7 @@ import { subscribeToSports } from "../../utils/firebase/events";
 import { subscribeToPlayerPrivate, subscribeToPlayers } from "../../utils/firebase/players";
 import { buildImportRows, identityKey, importPlayers, parseCsvFile, templateCsv } from "../../utils/firebase/bulkImport";
 import { downloadTextFile } from "../../utils/download";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
 const downloadTemplate = (sportNames) => downloadTextFile("players-template.csv", templateCsv(sportNames));
@@ -121,13 +122,13 @@ export default function PlayerImport() {
 
   return (
     <Box sx={{ maxWidth: 1000 }}>
-      <Typography variant="h5" fontWeight={700} gutterBottom>
-        Bulk upload players
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Upload a CSV file to add many players at once. They go straight into the player pool (no approval step). Players
-        with an email can log in to the event portal with it.
-      </Typography>
+      <DashboardHero
+        title="Bulk upload players"
+        subtitle="Upload a CSV to add many players at once -- straight into the pool, no approval step."
+        image={heroImageFor("import")}
+        icon={<UploadFileIcon />}
+        dense
+      />
 
       {result && (
         <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mb: 3 }} action={<Button component={RouterLink} to={`/app/events/${eventId}/players`}>View pool</Button>}>

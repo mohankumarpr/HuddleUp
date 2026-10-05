@@ -12,11 +12,13 @@ import {
   Typography,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import GroupsIcon from "@mui/icons-material/Groups";
 import IconButton from "@mui/material/IconButton";
 import { useAuth } from "../../context/AuthContext";
 import { subscribeToMembers } from "../../utils/firebase/organizations";
 import { createInvite, revokeInvite, subscribeToPendingInvites } from "../../utils/firebase/invites";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
 export default function OrganizerInvites() {
@@ -78,13 +80,13 @@ export default function OrganizerInvites() {
 
   return (
     <Box sx={{ maxWidth: 700 }}>
-      <Typography variant="h5" fontWeight={700} sx={{ mb: 1 }}>
-        Co-organizers
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Everyone here can manage every event under <b>{organization?.name}</b>. Only the owner can invite or remove
-        co-organizers.
-      </Typography>
+      <DashboardHero
+        title="Co-organizers"
+        subtitle={`Everyone here can manage every event under ${organization?.name || "your organization"}.`}
+        image={heroImageFor("organizers")}
+        icon={<GroupsIcon />}
+        dense
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

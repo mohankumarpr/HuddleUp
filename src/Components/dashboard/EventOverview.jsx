@@ -17,14 +17,17 @@ import {
   Typography,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import EventIcon from "@mui/icons-material/Event";
-import PlaceIcon from "@mui/icons-material/Place";
 import GroupsIcon from "@mui/icons-material/Groups";
 import GavelIcon from "@mui/icons-material/Gavel";
 import MaleIcon from "@mui/icons-material/Male";
 import FemaleIcon from "@mui/icons-material/Female";
 import PersonIcon from "@mui/icons-material/Person";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import SportsScoreIcon from "@mui/icons-material/SportsScore";
+import HowToRegIcon from "@mui/icons-material/HowToReg";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import ShareIcon from "@mui/icons-material/Share";
 import { getTeamOwners, subscribeToEvent, subscribeToSports, subscribeToTeams, updateEvent } from "../../utils/firebase/events";
 import { subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToPendingRegistrationCount } from "../../utils/firebase/registrations";
@@ -32,6 +35,7 @@ import { subscribeToResults, subscribeToSportStats } from "../../utils/firebase/
 import { formatDate, formatDateTime, participantsLabel, sortSportsBySchedule } from "../../utils/format";
 import QrCodeButton from "../common/QrCodeButton";
 import StandingsTable from "../common/StandingsTable";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
 const STATUS_FLOW = ["draft", "registration_open", "live", "ended"];
@@ -39,22 +43,54 @@ const STATUS_LABEL = { draft: "Draft", registration_open: "Registration open", l
 const GENDER_ICON = { male: <MaleIcon />, female: <FemaleIcon />, other: <PersonIcon /> };
 
 const NAV = [
-  { to: "sports", label: "Sports", desc: "Dates, rules and participant counts" },
-  { to: "teams", label: "Teams", desc: "Teams, captains, purses and PINs" },
-  { to: "registrations", label: "Registrations", desc: "Review and approve player sign-ups" },
-  { to: "players", label: "Player pool", desc: "Everyone eligible for the auction" },
-  { to: "import", label: "Bulk upload", desc: "Add many players from a CSV file" },
-  { to: "standings", label: "Standings", desc: "Enter points for each sport" },
-  { to: "console", label: "Live auction console", desc: "Run the auction and confirm sales" },
+  { to: "sports", label: "Sports", desc: "Dates, rules and participant counts", icon: <SportsScoreIcon />, color: "#6366F1" },
+  { to: "teams", label: "Teams", desc: "Teams, captains, purses and PINs", icon: <GroupsIcon />, color: "#EC4899" },
+  { to: "registrations", label: "Registrations", desc: "Review and approve player sign-ups", icon: <HowToRegIcon />, color: "#10B981" },
+  { to: "players", label: "Player pool", desc: "Everyone eligible for the auction", icon: <PersonIcon />, color: "#F59E0B" },
+  { to: "import", label: "Bulk upload", desc: "Add many players from a CSV file", icon: <UploadFileIcon />, color: "#0EA5E9" },
+  { to: "standings", label: "Standings", desc: "Enter points for each sport", icon: <EmojiEventsIcon />, color: "#8B5CF6" },
+  { to: "console", label: "Live auction console", desc: "Run the auction and confirm sales", icon: <GavelIcon />, color: "#EF4444" },
 ];
 
-function StatTile({ label, value, hint }) {
+const STAT_COLORS = ["#6366F1", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#0EA5E9"];
+
+function StatTile({ label, value, hint, icon, color }) {
   return (
-    <Card variant="outlined" sx={{ height: "100%" }}>
-      <CardContent>
-        <Typography variant="caption" color="text.secondary">
-          {label}
-        </Typography>
+    <Card
+      variant="outlined"
+      sx={{
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          background: `linear-gradient(135deg, ${color}18 0%, transparent 70%)`,
+        },
+      }}
+    >
+      <CardContent sx={{ position: "relative" }}>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: 1.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: `${color}22`,
+              color,
+              "& svg": { fontSize: 16 },
+            }}
+          >
+            {icon}
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            {label}
+          </Typography>
+        </Stack>
         <Typography variant="h4" fontWeight={800}>
           {value}
         </Typography>
@@ -65,6 +101,28 @@ function StatTile({ label, value, hint }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function SectionTitle({ icon, color, children }) {
+  return (
+    <Stack direction="row" alignItems="center" spacing={1.25}>
+      <Box
+        sx={{
+          width: 32,
+          height: 32,
+          borderRadius: 1.5,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: `${color}22`,
+          color,
+        }}
+      >
+        {icon}
+      </Box>
+      <Typography variant="h6">{children}</Typography>
+    </Stack>
   );
 }
 
@@ -151,40 +209,34 @@ export default function EventOverview() {
     }
   }
 
+  const heroSubtitleParts = [event.eventDate && formatDate(event.eventDate), event.venue].filter(Boolean);
+
   return (
     <Box>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "flex-start" }} spacing={2} sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="h4" fontWeight={800}>
-            {event.name}
-          </Typography>
-          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ color: "text.secondary", mt: 0.5 }}>
-            {event.eventDate && (
-              <Stack direction="row" spacing={0.5} alignItems="center">
-                <EventIcon fontSize="small" />
-                <Typography variant="body2">{formatDate(event.eventDate)}</Typography>
-              </Stack>
-            )}
-            {event.venue && (
-              <Stack direction="row" spacing={0.5} alignItems="center">
-                <PlaceIcon fontSize="small" />
-                <Typography variant="body2">{event.venue}</Typography>
-              </Stack>
-            )}
+      <DashboardHero
+        title={event.name}
+        subtitle={heroSubtitleParts.join(" · ") || event.description}
+        image={heroImageFor(event.id)}
+        icon={<SportsScoreIcon />}
+        action={
+          <Stack direction={{ xs: "row", sm: "column" }} alignItems={{ xs: "center", sm: "flex-end" }} spacing={1}>
+            <Chip label={STATUS_LABEL[event.status]} sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "#fff", fontWeight: 700 }} />
+            <Button
+              size="small"
+              variant={isLast ? "outlined" : "contained"}
+              onClick={advanceStatus}
+              disabled={isLast}
+              sx={
+                isLast
+                  ? { color: "#fff", borderColor: "rgba(255,255,255,0.4)" }
+                  : { bgcolor: "#fff", color: "primary.dark", "&:hover": { bgcolor: "rgba(255,255,255,0.9)" } }
+              }
+            >
+              {isLast ? "Event ended" : `Mark as "${STATUS_LABEL[nextStatus]}"`}
+            </Button>
           </Stack>
-          {event.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 640 }}>
-              {event.description}
-            </Typography>
-          )}
-        </Box>
-        <Stack alignItems={{ xs: "flex-start", sm: "flex-end" }} spacing={1}>
-          <Chip label={STATUS_LABEL[event.status]} color="primary" />
-          <Button size="small" variant="outlined" onClick={advanceStatus} disabled={isLast}>
-            {isLast ? "Event ended" : `Mark as "${STATUS_LABEL[nextStatus]}"`}
-          </Button>
-        </Stack>
-      </Stack>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -194,31 +246,45 @@ export default function EventOverview() {
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={6} md={2}>
-          <StatTile label="Teams" value={teams.length} />
+          <StatTile label="Teams" value={teams.length} icon={<GroupsIcon fontSize="inherit" />} color={STAT_COLORS[0]} />
         </Grid>
         <Grid item xs={6} md={2}>
-          <StatTile label="Sports" value={sports.length} hint={`${sports.filter((s) => s.date).length} scheduled`} />
+          <StatTile
+            label="Sports"
+            value={sports.length}
+            hint={`${sports.filter((s) => s.date).length} scheduled`}
+            icon={<SportsScoreIcon fontSize="inherit" />}
+            color={STAT_COLORS[1]}
+          />
         </Grid>
         <Grid item xs={6} md={2}>
-          <StatTile label="Players" value={players.length} hint={`${count("pool")} in pool`} />
+          <StatTile
+            label="Players"
+            value={players.length}
+            hint={`${count("pool")} in pool`}
+            icon={<PersonIcon fontSize="inherit" />}
+            color={STAT_COLORS[2]}
+          />
         </Grid>
         <Grid item xs={6} md={2}>
-          <StatTile label="Pending sign-ups" value={pending} />
+          <StatTile label="Pending sign-ups" value={pending} icon={<HowToRegIcon fontSize="inherit" />} color={STAT_COLORS[3]} />
         </Grid>
         <Grid item xs={6} md={2}>
-          <StatTile label="Sold" value={count("sold")} />
+          <StatTile label="Sold" value={count("sold")} icon={<GavelIcon fontSize="inherit" />} color={STAT_COLORS[4]} />
         </Grid>
         <Grid item xs={6} md={2}>
-          <StatTile label="Unsold" value={count("unsold")} />
+          <StatTile label="Unsold" value={count("unsold")} icon={<PersonIcon fontSize="inherit" />} color={STAT_COLORS[5]} />
         </Grid>
       </Grid>
 
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} md={7}>
-          <Card variant="outlined" sx={{ height: "100%" }}>
+          <Card variant="outlined" sx={{ height: "100%", borderTop: "3px solid", borderTopColor: STAT_COLORS[0] }}>
             <CardContent>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                <Typography variant="h6">Teams</Typography>
+                <SectionTitle icon={<GroupsIcon fontSize="small" />} color={STAT_COLORS[0]}>
+                  Teams
+                </SectionTitle>
                 <Button size="small" component={RouterLink} to={`/app/events/${event.id}/teams`} endIcon={<ArrowForwardIcon />}>
                   Manage
                 </Button>
@@ -264,10 +330,12 @@ export default function EventOverview() {
         </Grid>
 
         <Grid item xs={12} md={5}>
-          <Card variant="outlined" sx={{ height: "100%" }}>
+          <Card variant="outlined" sx={{ height: "100%", borderTop: "3px solid", borderTopColor: STAT_COLORS[5] }}>
             <CardContent>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                <Typography variant="h6">Standings</Typography>
+                <SectionTitle icon={<EmojiEventsIcon fontSize="small" />} color={STAT_COLORS[5]}>
+                  Standings
+                </SectionTitle>
                 <Button size="small" component={RouterLink} to={`/app/events/${event.id}/standings`} endIcon={<ArrowForwardIcon />}>
                   Enter points
                 </Button>
@@ -278,10 +346,12 @@ export default function EventOverview() {
         </Grid>
       </Grid>
 
-      <Card variant="outlined" sx={{ mb: 3 }}>
+      <Card variant="outlined" sx={{ mb: 3, borderTop: "3px solid", borderTopColor: STAT_COLORS[1] }}>
         <CardContent>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="h6">Sports schedule</Typography>
+            <SectionTitle icon={<SportsScoreIcon fontSize="small" />} color={STAT_COLORS[1]}>
+              Sports schedule
+            </SectionTitle>
             <Button size="small" component={RouterLink} to={`/app/events/${event.id}/sports`} endIcon={<ArrowForwardIcon />}>
               Manage
             </Button>
@@ -330,11 +400,13 @@ export default function EventOverview() {
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}>
-          <Card variant="outlined" sx={{ height: "100%" }}>
+          <Card variant="outlined" sx={{ height: "100%", borderTop: "3px solid", borderTopColor: STAT_COLORS[2] }}>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Share
-              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <SectionTitle icon={<ShareIcon fontSize="small" />} color={STAT_COLORS[2]}>
+                  Share
+                </SectionTitle>
+              </Box>
               <Stack spacing={1.5}>
                 <CopyRow label="Public event page (schedule, standings, no login)" value={links.public} />
                 <CopyRow label="Player registration link" value={links.registration} />
@@ -357,12 +429,34 @@ export default function EventOverview() {
           <Grid container spacing={2}>
             {NAV.map((item) => (
               <Grid item xs={12} sm={6} key={item.to}>
-                <Card variant="outlined">
-                  <CardActionArea component={RouterLink} to={`/app/events/${event.id}/${item.to}`} sx={{ p: 2 }}>
-                    <Typography fontWeight={600}>{item.label}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {item.desc}
-                    </Typography>
+                <Card
+                  variant="outlined"
+                  sx={{ height: "100%", transition: "box-shadow 0.2s ease, transform 0.2s ease", "&:hover": { boxShadow: 4, transform: "translateY(-2px)" } }}
+                >
+                  <CardActionArea component={RouterLink} to={`/app/events/${event.id}/${item.to}`} sx={{ p: 2, height: "100%" }}>
+                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                      <Box
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 1.5,
+                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: `${item.color}22`,
+                          color: item.color,
+                        }}
+                      >
+                        {item.icon}
+                      </Box>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography fontWeight={600}>{item.label}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {item.desc}
+                        </Typography>
+                      </Box>
+                    </Stack>
                   </CardActionArea>
                 </Card>
               </Grid>

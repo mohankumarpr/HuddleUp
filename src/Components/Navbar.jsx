@@ -28,6 +28,10 @@ function Navbar() {
   const { mode, toggleMode } = useThemeMode();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // The organizer dashboard (DashboardLayout) has its own branded, mobile-responsive top bar --
+  // this marketing navbar would just duplicate it.
+  if (location.pathname.startsWith('/app')) return null;
+
   const navLinks = [
     { label: 'Home', to: '/' },
     { label: isOrganizer ? 'Dashboard' : 'Organizer Login', to: isOrganizer ? '/app/events' : '/login' },

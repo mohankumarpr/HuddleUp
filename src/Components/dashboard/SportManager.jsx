@@ -24,8 +24,10 @@ import EventIcon from "@mui/icons-material/Event";
 import PlaceIcon from "@mui/icons-material/Place";
 import GroupsIcon from "@mui/icons-material/Groups";
 import GavelIcon from "@mui/icons-material/Gavel";
+import SportsScoreIcon from "@mui/icons-material/SportsScore";
 import { createSport, deleteSport, subscribeToSports, updateSport } from "../../utils/firebase/events";
 import { formatDateTime, participantsLabel } from "../../utils/format";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
 const EMPTY = { name: "", description: "", date: "", venue: "", rules: "", playersPerTeam: "", maxParticipants: "", active: true };
@@ -165,17 +167,23 @@ export default function SportManager() {
 
   return (
     <Box sx={{ maxWidth: 800 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-        <Typography variant="h5" fontWeight={700}>
-          Sports
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ open: true, sport: null })}>
-          Add sport
-        </Button>
-      </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Sports players can register for. Dates, rules and participant counts can be added or changed at any time.
-      </Typography>
+      <DashboardHero
+        title="Sports"
+        subtitle="Dates, rules and participant counts can be added or changed at any time."
+        image={heroImageFor("sports")}
+        icon={<SportsScoreIcon />}
+        dense
+        action={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setDialog({ open: true, sport: null })}
+            sx={{ bgcolor: "#fff", color: "primary.dark", "&:hover": { bgcolor: "rgba(255,255,255,0.9)" } }}
+          >
+            Add sport
+          </Button>
+        }
+      />
 
       <Stack spacing={1.5}>
         {sports.length === 0 && <Typography color="text.secondary">No sports added yet.</Typography>}

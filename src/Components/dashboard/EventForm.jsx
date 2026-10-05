@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import { useAuth } from "../../context/AuthContext";
 import { createEvent } from "../../utils/firebase/events";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 
 export default function EventForm() {
   const navigate = useNavigate();
@@ -37,10 +39,9 @@ export default function EventForm() {
   }
 
   return (
-    <Paper variant="outlined" sx={{ p: 4, maxWidth: 560 }}>
-      <Typography variant="h5" fontWeight={700} gutterBottom>
-        Create a new event
-      </Typography>
+    <Box sx={{ maxWidth: 560 }}>
+      <DashboardHero title="Create a new event" image={heroImageFor("new-event")} icon={<AddIcon />} dense />
+      <Paper variant="outlined" sx={{ p: 4 }}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         You'll be able to configure sports, teams, and registration after creating the event.
       </Typography>
@@ -90,6 +91,7 @@ export default function EventForm() {
           </Button>
         </Stack>
       </Box>
-    </Paper>
+      </Paper>
+    </Box>
   );
 }

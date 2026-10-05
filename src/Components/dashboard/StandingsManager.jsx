@@ -18,10 +18,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import { saveResults, saveSportStats, subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
 import { sortSportsBySchedule } from "../../utils/format";
 import StandingsTable from "../common/StandingsTable";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
 const STAT_FIELDS = ["played", "won", "drawn", "lost"];
@@ -151,22 +153,21 @@ export default function StandingsManager() {
 
   return (
     <Box sx={{ maxWidth: 1000 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-        <Typography variant="h5" fontWeight={700}>
-          Standings
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Button disabled={!dirtySportIds.length || saving} onClick={() => setDraft({})}>
-            Discard
-          </Button>
-          <Button variant="contained" disabled={!dirtySportIds.length || saving} onClick={handleSave}>
-            {saving ? "Saving..." : "Save points"}
-          </Button>
-        </Stack>
+      <DashboardHero
+        title="Standings"
+        subtitle="Enter the points each team earned in each sport -- players logged into the portal see these too."
+        image={heroImageFor("standings")}
+        icon={<EmojiEventsIcon />}
+        dense
+      />
+      <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mb: 2 }}>
+        <Button disabled={!dirtySportIds.length || saving} onClick={() => setDraft({})}>
+          Discard
+        </Button>
+        <Button variant="contained" disabled={!dirtySportIds.length || saving} onClick={handleSave}>
+          {saving ? "Saving..." : "Save points"}
+        </Button>
       </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Enter the points each team earned in each sport. Players logged in to the event portal see these standings.
-      </Typography>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

@@ -21,8 +21,12 @@ const LINK_COLUMNS = [
 const Footer = () => {
   const { isOrganizer } = useAuth();
   const { pathname } = useLocation();
-  // The sign-up banner is marketing -- keep it off the dashboard and the pages players/teams use.
-  const showCta = !pathname.startsWith('/app') && !pathname.startsWith('/e/');
+  // The organizer dashboard is a logged-in app shell, not a marketing page -- a footer full of
+  // login/signup links there is both visual deadweight and confusing while already signed in.
+  if (pathname.startsWith('/app')) return null;
+
+  // The sign-up banner is marketing -- keep it off the pages players/teams use.
+  const showCta = !pathname.startsWith('/e/');
   const currentYear = new Date().getFullYear();
 
   return (

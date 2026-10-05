@@ -15,10 +15,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import HowToRegIcon from "@mui/icons-material/HowToReg";
 import { useAuth } from "../../context/AuthContext";
 import { subscribeToSports } from "../../utils/firebase/events";
 import { subscribeToRegistrations } from "../../utils/firebase/registrations";
 import { promoteRegistrationToPlayer, rejectRegistrationRequest } from "../../utils/firebase/players";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
 export default function RegistrationReviewQueue() {
@@ -72,12 +74,13 @@ export default function RegistrationReviewQueue() {
 
   return (
     <Box sx={{ maxWidth: 720 }}>
-      <Typography variant="h5" fontWeight={700} gutterBottom>
-        Registration review
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Approve a registration to add it to the auction-eligible player pool.
-      </Typography>
+      <DashboardHero
+        title="Registration review"
+        subtitle="Approve a registration to add it to the auction-eligible player pool."
+        image={heroImageFor("registrations")}
+        icon={<HowToRegIcon />}
+        dense
+      />
 
       {registrations.length === 0 && (
         <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>

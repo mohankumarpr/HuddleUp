@@ -117,7 +117,7 @@ export default function HeroCarousel() {
                 transition={{ duration: 0.4 }}
               >
                 <Chip
-                  label={`${slide.emoji} Perfect for ${slide.sport} auctions`}
+                  label={`${slide.emoji} Perfect for ${slide.sport} events`}
                   sx={{ mb: 3, bgcolor: "rgba(255,255,255,0.12)", color: "#fff", fontWeight: 600 }}
                 />
               </motion.div>

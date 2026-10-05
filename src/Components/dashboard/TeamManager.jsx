@@ -24,6 +24,7 @@ import AutorenewIcon from "@mui/icons-material/Autorenew";
 import MaleIcon from "@mui/icons-material/Male";
 import FemaleIcon from "@mui/icons-material/Female";
 import PersonIcon from "@mui/icons-material/Person";
+import GroupsIcon from "@mui/icons-material/Groups";
 import {
   createTeam,
   deleteTeam,
@@ -35,6 +36,7 @@ import {
   updateTeam,
 } from "../../utils/firebase/events";
 import QrCodeButton from "../common/QrCodeButton";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
 const GENDER_ICON = { male: <MaleIcon />, female: <FemaleIcon />, other: <PersonIcon /> };
@@ -208,18 +210,23 @@ export default function TeamManager() {
 
   return (
     <Box sx={{ maxWidth: 800 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-        <Typography variant="h5" fontWeight={700}>
-          Teams
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ open: true, team: null })}>
-          Add team
-        </Button>
-      </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Each team can have any number of owners or captains. The join PIN, together with the event's join code, lets a
-        team rep bid live.
-      </Typography>
+      <DashboardHero
+        title="Teams"
+        subtitle="Any number of owners or captains per team. The join PIN + event code let a rep bid live."
+        image={heroImageFor("teams")}
+        icon={<GroupsIcon />}
+        dense
+        action={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setDialog({ open: true, team: null })}
+            sx={{ bgcolor: "#fff", color: "primary.dark", "&:hover": { bgcolor: "rgba(255,255,255,0.9)" } }}
+          >
+            Add team
+          </Button>
+        }
+      />
 
       <Stack spacing={1.5}>
         {teams.length === 0 && <Typography color="text.secondary">No teams added yet.</Typography>}

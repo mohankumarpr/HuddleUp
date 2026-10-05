@@ -5,12 +5,14 @@ import SearchIcon from "@mui/icons-material/Search";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import DownloadIcon from "@mui/icons-material/Download";
 import HistoryIcon from "@mui/icons-material/History";
+import PersonIcon from "@mui/icons-material/Person";
 import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import { subscribeToPlayerPrivate, subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import { downloadTextFile } from "../../utils/download";
 import { buildResultsCsv } from "../../utils/resultsExport";
 import BidHistoryList from "../common/BidHistoryList";
+import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
 const STATUS_COLOR = {
@@ -71,22 +73,35 @@ export default function PlayerPool() {
 
   return (
     <Box sx={{ maxWidth: 860 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1, gap: 1 }}>
-        <Typography variant="h5" fontWeight={700}>
-          Player pool
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExport} disabled={players.length === 0}>
-            Export CSV
-          </Button>
-          <Button variant="outlined" startIcon={<UploadFileIcon />} component={RouterLink} to={`/app/events/${eventId}/import`}>
-            Bulk upload
-          </Button>
-        </Stack>
-      </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {players.length} player{players.length === 1 ? "" : "s"} approved for the auction.
-      </Typography>
+      <DashboardHero
+        title="Player pool"
+        subtitle={`${players.length} player${players.length === 1 ? "" : "s"} approved for the auction.`}
+        image={heroImageFor("players")}
+        icon={<PersonIcon />}
+        dense
+        action={
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              onClick={handleExport}
+              disabled={players.length === 0}
+              sx={{ bgcolor: "#fff", color: "primary.dark", "&:hover": { bgcolor: "rgba(255,255,255,0.9)" } }}
+            >
+              Export CSV
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<UploadFileIcon />}
+              component={RouterLink}
+              to={`/app/events/${eventId}/import`}
+              sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.5)", "&:hover": { borderColor: "#fff" } }}
+            >
+              Bulk upload
+            </Button>
+          </Stack>
+        }
+      />
 
       <TextField
         size="small"
