@@ -28,7 +28,7 @@ const GENDER_ICON = { male: <MaleIcon />, female: <FemaleIcon />, other: <Person
 // player portal. `myTeamId` (optional) highlights the viewer's own team. `extraTab` (optional)
 // prepends one more tab -- e.g. the player portal's "My details" -- so the caller doesn't have to
 // duplicate this whole tab strip just to add one tab of its own.
-export default function EventInfoTabs({ teams, sports, results, players = [], myTeamId, extraTab }) {
+export default function EventInfoTabs({ teams, sports, results, statsBySport, players = [], myTeamId, extraTab }) {
   const [tab, setTab] = useState(0);
   const offset = extraTab ? 1 : 0;
 
@@ -43,7 +43,9 @@ export default function EventInfoTabs({ teams, sports, results, players = [], my
 
       {extraTab && tab === 0 && extraTab.content}
 
-      {tab === 0 + offset && <StandingsTable teams={teams} results={results} sports={sports} showBreakdown />}
+      {tab === 0 + offset && (
+        <StandingsTable teams={teams} results={results} sports={sports} statsBySport={statsBySport} showBreakdown />
+      )}
 
       {tab === 1 + offset && (
         <Grid container spacing={2}>

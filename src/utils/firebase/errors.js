@@ -21,6 +21,9 @@ const FRIENDLY_MESSAGES = {
   INVALID_JOIN_CODE: "That event code doesn't match any live event.",
   INVALID_PIN: "That team PIN is incorrect.",
   NOTHING_TO_UNDO: "There's nothing to undo -- the last sale has already been superseded.",
+  INVITE_NOT_FOUND: "This invite link is no longer valid -- it may have been revoked or already used.",
+  INVITE_EMAIL_MISMATCH: "This invite was sent to a different email address. Sign in or sign up with that email to accept it.",
+  ALREADY_IN_ANOTHER_ORG: "This account already belongs to a different organization. Accept this invite with a different email instead.",
 };
 
 export function friendlyErrorMessage(err) {

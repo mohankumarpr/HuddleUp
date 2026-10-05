@@ -34,6 +34,7 @@ import {
   subscribeToTeams,
   updateTeam,
 } from "../../utils/firebase/events";
+import QrCodeButton from "../common/QrCodeButton";
 import LoadingSpinner from "../LoadingSpinner";
 
 const GENDER_ICON = { male: <MaleIcon />, female: <FemaleIcon />, other: <PersonIcon /> };
@@ -254,6 +255,10 @@ export default function TeamManager() {
                 </Box>
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   <Chip label={`PIN ${team.joinPin}`} size="small" sx={{ fontFamily: "monospace" }} />
+                  <QrCodeButton
+                    value={`${window.location.origin}/e/${event.slug}/join?code=${event.joinCode}&team=${team.id}&pin=${team.joinPin}`}
+                    label={`${team.name} join QR`}
+                  />
                   <Tooltip title="Generate a new PIN">
                     <IconButton size="small" onClick={() => resetPin(team)} aria-label={`Reset PIN for ${team.name}`}>
                       <AutorenewIcon fontSize="small" />

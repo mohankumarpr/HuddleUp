@@ -23,6 +23,8 @@ export async function signUpOrganizer({ email, password, displayName, orgName })
   const orgId = await createOrganizationWithOwner({
     name: orgName,
     ownerUid: cred.user.uid,
+    email,
+    displayName,
   });
 
   await setDoc(doc(db, "users", cred.user.uid), {

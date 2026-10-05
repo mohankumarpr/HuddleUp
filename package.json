@@ -13,6 +13,7 @@
     "firebase": "^11.10.0",
     "framer-motion": "^13.4.0",
     "papaparse": "^5.7.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-intersection-observer": "^11.0.1",

@@ -9,7 +9,7 @@ import GavelIcon from "@mui/icons-material/Gavel";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import LoginIcon from "@mui/icons-material/Login";
 import { getEventBySlug, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
-import { subscribeToResults } from "../../utils/firebase/results";
+import { subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
 import { formatDate, sortSportsBySchedule } from "../../utils/format";
 import useDocumentTitle from "../../utils/useDocumentTitle";
 import { APP_NAME } from "../../branding";
@@ -25,6 +25,7 @@ export default function PublicEventPage() {
   const [teams, setTeams] = useState([]);
   const [sports, setSports] = useState([]);
   const [results, setResults] = useState({});
+  const [stats, setStats] = useState({});
 
   useEffect(() => {
     (async () => setEvent(await getEventBySlug(eventSlug)))();
@@ -36,6 +37,7 @@ export default function PublicEventPage() {
       subscribeToTeams(event.id, setTeams),
       subscribeToSports(event.id, setSports),
       subscribeToResults(event.id, setResults, () => setResults({})),
+      subscribeToSportStats(event.id, setStats, () => setStats({})),
     ];
     return () => unsubs.forEach((u) => u());
   }, [event]);
@@ -113,7 +115,7 @@ export default function PublicEventPage() {
         <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
           Schedule, teams & standings
         </Typography>
-        <EventInfoTabs teams={teams} sports={orderedSports} results={results} />
+        <EventInfoTabs teams={teams} sports={orderedSports} results={results} statsBySport={stats} />
       </Container>
     </Box>
   );

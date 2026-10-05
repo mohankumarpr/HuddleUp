@@ -19,6 +19,9 @@ export default function DashboardLayout() {
           >
             {organization?.name || "My Organization"}
           </Typography>
+          <Button size="small" component={RouterLink} to="/app/organizers">
+            Co-organizers
+          </Button>
           <Typography variant="body2" color="text.secondary">
             {profile?.displayName || profile?.email}
           </Typography>

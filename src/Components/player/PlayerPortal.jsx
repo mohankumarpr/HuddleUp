@@ -9,7 +9,7 @@ import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { getEventBySlug, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import { claimPlayerRecord } from "../../utils/firebase/participants";
 import { subscribeToPlayers } from "../../utils/firebase/players";
-import { subscribeToResults } from "../../utils/firebase/results";
+import { subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
 import { formatDate, sortSportsBySchedule } from "../../utils/format";
 import useDocumentTitle from "../../utils/useDocumentTitle";
 import { APP_NAME } from "../../branding";
@@ -115,6 +115,7 @@ export default function PlayerPortal() {
   const [sports, setSports] = useState([]);
   const [players, setPlayers] = useState([]);
   const [results, setResults] = useState({});
+  const [stats, setStats] = useState({});
 
   useEffect(() => {
     (async () => setEvent(await getEventBySlug(eventSlug)))();
@@ -143,6 +144,7 @@ export default function PlayerPortal() {
       subscribeToSports(event.id, setSports),
       subscribeToPlayers(event.id, setPlayers),
       subscribeToResults(event.id, setResults, () => setResults({})),
+      subscribeToSportStats(event.id, setStats, () => setStats({})),
     ];
     return () => unsubs.forEach((u) => u());
   }, [event, isMember]);
@@ -253,7 +255,15 @@ export default function PlayerPortal() {
         </Typography>
       )}
 
-      <EventInfoTabs teams={teams} sports={orderedSports} results={results} players={players} myTeamId={myTeam?.id} extraTab={myDetailsTab} />
+      <EventInfoTabs
+        teams={teams}
+        sports={orderedSports}
+        results={results}
+        statsBySport={stats}
+        players={players}
+        myTeamId={myTeam?.id}
+        extraTab={myDetailsTab}
+      />
     </Container>
   );
 }

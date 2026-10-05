@@ -6,8 +6,8 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Container,
-  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -18,8 +18,8 @@ import { motion } from "framer-motion";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import SportsScoreIcon from "@mui/icons-material/SportsScore";
 import { getEventBySlug, subscribeToSports } from "../../utils/firebase/events";
-import { attachRegistrationPhoto, submitRegistration } from "../../utils/firebase/registrations";
-import { uploadRegistrationPhoto } from "../../utils/firebase/storage";
+import { submitRegistration } from "../../utils/firebase/registrations";
+import { compressImageFile } from "../../utils/image";
 import LoadingSpinner from "../LoadingSpinner";
 
 const HERO_FALLBACK =
@@ -52,9 +52,8 @@ export default function PublicRegistrationForm() {
   const [block, setBlock] = useState("");
   const [aboutMe, setAboutMe] = useState("");
   const [sportIds, setSportIds] = useState([]);
-  const [photo, setPhoto] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(null);
+  const [photoDataUrl, setPhotoDataUrl] = useState(null);
+  const [compressingPhoto, setCompressingPhoto] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [submitted, setSubmitted] = useState(false);
@@ -69,18 +68,24 @@ export default function PublicRegistrationForm() {
     return () => unsubSports && unsubSports();
   }, [eventSlug]);
 
-  useEffect(() => {
-    if (!photo) {
-      setPhotoPreview(null);
-      return undefined;
-    }
-    const url = URL.createObjectURL(photo);
-    setPhotoPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
-
   function toggleSport(sportId) {
     setSportIds((prev) => (prev.includes(sportId) ? prev.filter((id) => id !== sportId) : [...prev, sportId]));
+  }
+
+  async function handlePhotoChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-choosing the same file later
+    if (!file) return;
+    setError(null);
+    setCompressingPhoto(true);
+    try {
+      const dataUrl = await compressImageFile(file);
+      setPhotoDataUrl(dataUrl);
+    } catch (err) {
+      setError(err.message || "Couldn't process that photo.");
+    } finally {
+      setCompressingPhoto(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -88,17 +93,12 @@ export default function PublicRegistrationForm() {
     setError(null);
     setSubmitting(true);
     try {
-      const registrationId = await submitRegistration(event.id, { name, contact, email, gender, block, aboutMe, sportIds });
-      if (photo) {
-        const photoUrl = await uploadRegistrationPhoto(event.orgId, event.id, registrationId, photo, setUploadProgress);
-        await attachRegistrationPhoto(event.id, registrationId, photoUrl);
-      }
+      await submitRegistration(event.id, { name, contact, email, gender, block, aboutMe, sportIds, photoUrl: photoDataUrl });
       setSubmitted(true);
     } catch (err) {
       setError(err.message || "Couldn't submit your registration. Please try again.");
     } finally {
       setSubmitting(false);
-      setUploadProgress(null);
     }
   }
 
@@ -176,18 +176,21 @@ export default function PublicRegistrationForm() {
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={3}>
                 <Stack direction="row" spacing={2} alignItems="center">
-                  <Avatar src={photoPreview} sx={{ width: 64, height: 64, bgcolor: "action.disabledBackground" }} />
+                  <Avatar src={photoDataUrl} sx={{ width: 64, height: 64, bgcolor: "action.disabledBackground" }} />
                   <Box>
-                    <Button variant="outlined" component="label" size="small">
-                      {photo ? "Change photo" : "Add a photo"}
-                      <input type="file" accept="image/*" hidden onChange={(e) => setPhoto(e.target.files?.[0] || null)} />
+                    <Button variant="outlined" component="label" size="small" disabled={compressingPhoto}>
+                      {compressingPhoto ? (
+                        <CircularProgress size={16} sx={{ mr: 1 }} />
+                      ) : photoDataUrl ? (
+                        "Change photo"
+                      ) : (
+                        "Add a photo"
+                      )}
+                      <input type="file" accept="image/*" hidden onChange={handlePhotoChange} />
                     </Button>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                       Optional
                     </Typography>
-                    {uploadProgress != null && (
-                      <LinearProgress variant="determinate" value={uploadProgress} sx={{ mt: 1, width: 160 }} />
-                    )}
                   </Box>
                 </Stack>
 

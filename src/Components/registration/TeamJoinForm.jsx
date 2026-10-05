@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -23,15 +23,20 @@ const HERO_FALLBACK =
 export default function TeamJoinForm() {
   const { eventSlug } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [event, setEvent] = useState(undefined);
   const [teams, setTeams] = useState([]);
-  const [joinCode, setJoinCode] = useState("");
-  const [teamId, setTeamId] = useState("");
-  const [pin, setPin] = useState("");
+  const [joinCode, setJoinCode] = useState((searchParams.get("code") || "").toUpperCase());
+  const [teamId, setTeamId] = useState(searchParams.get("team") || "");
+  const [pin, setPin] = useState(searchParams.get("pin") || "");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // A team's QR code (see TeamManager) encodes code/team/pin as query params so scanning it
+  // leaves only "your name" to type.
+  const scannedIn = Boolean(searchParams.get("team"));
 
   useEffect(() => {
     let unsubTeams;
@@ -96,7 +101,9 @@ export default function TeamJoinForm() {
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
           <Paper elevation={4} sx={{ p: 4, borderRadius: 3 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Enter the event code and your team's PIN to bid live from this device.
+              {scannedIn
+                ? "Your team's QR code filled in the rest -- just add your name to join."
+                : "Enter the event code and your team's PIN to bid live from this device."}
             </Typography>
 
             {error && (
@@ -112,31 +119,43 @@ export default function TeamJoinForm() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   required
+                  autoFocus
                   fullWidth
                 />
-                <TextField
-                  label="Event code"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  required
-                  fullWidth
-                  inputProps={{ style: { textTransform: "uppercase" } }}
-                />
-                <TextField label="Team" select value={teamId} onChange={(e) => setTeamId(e.target.value)} required fullWidth>
-                  {teams.map((team) => (
-                    <MenuItem key={team.id} value={team.id}>
-                      {team.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  label="Team PIN"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  required
-                  fullWidth
-                  inputProps={{ inputMode: "numeric", maxLength: 4 }}
-                />
+                {scannedIn ? (
+                  <TextField
+                    label="Team"
+                    value={teams.find((t) => t.id === teamId)?.name || "Loading..."}
+                    disabled
+                    fullWidth
+                  />
+                ) : (
+                  <>
+                    <TextField
+                      label="Event code"
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                      required
+                      fullWidth
+                      inputProps={{ style: { textTransform: "uppercase" } }}
+                    />
+                    <TextField label="Team" select value={teamId} onChange={(e) => setTeamId(e.target.value)} required fullWidth>
+                      {teams.map((team) => (
+                        <MenuItem key={team.id} value={team.id}>
+                          {team.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    <TextField
+                      label="Team PIN"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value)}
+                      required
+                      fullWidth
+                      inputProps={{ inputMode: "numeric", maxLength: 4 }}
+                    />
+                  </>
+                )}
                 <Button type="submit" variant="contained" size="large" disabled={submitting || !teamId} sx={{ py: 1.4 }}>
                   {submitting ? "Joining..." : "Join and bid"}
                 </Button>

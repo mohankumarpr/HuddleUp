@@ -28,8 +28,9 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { getTeamOwners, subscribeToEvent, subscribeToSports, subscribeToTeams, updateEvent } from "../../utils/firebase/events";
 import { subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToPendingRegistrationCount } from "../../utils/firebase/registrations";
-import { subscribeToResults } from "../../utils/firebase/results";
+import { subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
 import { formatDate, formatDateTime, participantsLabel, sortSportsBySchedule } from "../../utils/format";
+import QrCodeButton from "../common/QrCodeButton";
 import StandingsTable from "../common/StandingsTable";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -83,6 +84,7 @@ function CopyRow({ label, value }) {
         <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all", flexGrow: 1 }}>
           {value}
         </Typography>
+        <QrCodeButton value={value} label={label} />
         <Tooltip title={copied ? "Copied!" : "Copy"}>
           <IconButton size="small" onClick={copy} aria-label={`Copy ${label}`}>
             <ContentCopyIcon fontSize="inherit" />
@@ -100,6 +102,7 @@ export default function EventOverview() {
   const [sports, setSports] = useState(null);
   const [players, setPlayers] = useState(null);
   const [results, setResults] = useState({});
+  const [stats, setStats] = useState({});
   const [pending, setPending] = useState(0);
   const [error, setError] = useState(null);
 
@@ -111,6 +114,7 @@ export default function EventOverview() {
       subscribeToPlayers(eventId, setPlayers),
       subscribeToPendingRegistrationCount(eventId, setPending),
       subscribeToResults(eventId, setResults, () => setResults({})),
+      subscribeToSportStats(eventId, setStats, () => setStats({})),
     ];
     return () => unsubs.forEach((u) => u());
   }, [eventId]);
@@ -268,7 +272,7 @@ export default function EventOverview() {
                   Enter points
                 </Button>
               </Stack>
-              <StandingsTable teams={teams} results={results} />
+              <StandingsTable teams={teams} results={results} statsBySport={stats} />
             </CardContent>
           </Card>
         </Grid>

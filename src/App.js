@@ -8,6 +8,7 @@ import Home from "./Components/marketing/Home";
 import NotFound from "./Components/NotFound";
 import LoginForm from "./Components/auth/LoginForm";
 import SignupForm from "./Components/auth/SignupForm";
+import AcceptInvite from "./Components/auth/AcceptInvite";
 import RequireOrganizer from "./Components/auth/RequireOrganizer";
 import DashboardLayout from "./Components/dashboard/DashboardLayout";
 import EventList from "./Components/dashboard/EventList";
@@ -19,6 +20,7 @@ import RegistrationReviewQueue from "./Components/dashboard/RegistrationReviewQu
 import PlayerPool from "./Components/dashboard/PlayerPool";
 import StandingsManager from "./Components/dashboard/StandingsManager";
 import PlayerImport from "./Components/dashboard/PlayerImport";
+import OrganizerInvites from "./Components/dashboard/OrganizerInvites";
 import PlayerPortal from "./Components/player/PlayerPortal";
 import PublicEventPage from "./Components/events/PublicEventPage";
 import OrganizerConsole from "./Components/auctionRoom/OrganizerConsole";
@@ -39,6 +41,7 @@ function App() {
 
               <Route path="/login" element={<LoginForm />} />
               <Route path="/signup" element={<SignupForm />} />
+              <Route path="/invite/:orgId/:inviteId" element={<AcceptInvite />} />
 
               <Route
                 path="/app"
@@ -50,6 +53,7 @@ function App() {
               >
                 <Route index element={<Navigate to="events" replace />} />
                 <Route path="events" element={<EventList />} />
+                <Route path="organizers" element={<OrganizerInvites />} />
                 <Route path="events/new" element={<EventForm />} />
                 <Route path="events/:eventId" element={<EventOverview />} />
                 <Route path="events/:eventId/sports" element={<SportManager />} />

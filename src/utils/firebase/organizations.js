@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  onSnapshot,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -21,7 +22,7 @@ function slugify(text) {
 // Creates the organization doc, then its owner membership doc, as two sequential writes
 // (not a batch) so the membership doc's security rule -- which reads the org doc's
 // ownerUid via get() -- always evaluates against an already-committed org doc.
-export async function createOrganizationWithOwner({ name, ownerUid }) {
+export async function createOrganizationWithOwner({ name, ownerUid, email, displayName }) {
   const orgRef = doc(collection(db, "organizations"));
   await setDoc(orgRef, {
     name,
@@ -35,6 +36,8 @@ export async function createOrganizationWithOwner({ name, ownerUid }) {
   try {
     await setDoc(doc(db, "organizations", orgRef.id, "members", ownerUid), {
       role: "owner",
+      email: email || "",
+      displayName: displayName || "",
       addedAt: serverTimestamp(),
     });
   } catch (err) {
@@ -55,6 +58,12 @@ export async function getMembership(orgId, uid) {
   if (!orgId || !uid) return null;
   const snap = await getDoc(doc(db, "organizations", orgId, "members", uid));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+export function subscribeToMembers(orgId, callback) {
+  return onSnapshot(collection(db, "organizations", orgId, "members"), (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  });
 }
 
 export async function updateOrganization(orgId, patch) {

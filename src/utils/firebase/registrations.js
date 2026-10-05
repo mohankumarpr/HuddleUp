@@ -14,7 +14,7 @@ import { db } from "./config";
 // Public, no-login submission -- the create rule on registrations/{regId} allows anyone.
 export async function submitRegistration(
   eventId,
-  { name, contact, email, gender, block, aboutMe, sportIds, requestedBasePrice }
+  { name, contact, email, gender, block, aboutMe, sportIds, requestedBasePrice, photoUrl }
 ) {
   const ref = doc(collection(db, "events", eventId, "registrations"));
   await setDoc(ref, {
@@ -27,17 +27,13 @@ export async function submitRegistration(
     aboutMe: (aboutMe || "").trim(),
     sportIds,
     requestedBasePrice: requestedBasePrice ?? null,
-    photoUrl: null,
+    photoUrl: photoUrl || null, // a compressed data: URL -- see src/utils/image.js
     status: "pending",
     submittedAt: serverTimestamp(),
     reviewedAt: null,
     reviewedBy: null,
   });
   return ref.id;
-}
-
-export async function attachRegistrationPhoto(eventId, registrationId, photoUrl) {
-  await updateDoc(doc(db, "events", eventId, "registrations", registrationId), { photoUrl });
 }
 
 // status omitted -> all registrations (organizer's full list); pass "pending" for the review queue.

@@ -6,11 +6,13 @@ import { computeStandings } from "../../utils/firebase/results";
 const MEDAL = { 1: "#F59E0B", 2: "#94A3B8", 3: "#B45309" };
 
 // Team standings from manually entered points. With `sports` + `showBreakdown` it also lists the
-// points each team earned per sport.
-export default function StandingsTable({ teams, results, sports = [], showBreakdown = false }) {
-  const rows = computeStandings(teams, results);
+// points each team earned per sport. `statsBySport` (optional) adds a played/won/drawn/lost
+// column, summed across whichever sports have a match record entered.
+export default function StandingsTable({ teams, results, sports = [], showBreakdown = false, statsBySport = null }) {
+  const rows = computeStandings(teams, results, statsBySport);
   const scoredSports = showBreakdown ? sports.filter((s) => results?.[s.id]) : [];
   const anyPoints = rows.some((r) => Object.keys(r.perSport).length > 0);
+  const anyStats = rows.some((r) => r.stats);
 
   if (!teams.length) {
     return (
@@ -33,6 +35,14 @@ export default function StandingsTable({ teams, results, sports = [], showBreakd
                   {s.name}
                 </TableCell>
               ))}
+              {anyStats && (
+                <>
+                  <TableCell align="right">P</TableCell>
+                  <TableCell align="right">W</TableCell>
+                  <TableCell align="right">D</TableCell>
+                  <TableCell align="right">L</TableCell>
+                </>
+              )}
               <TableCell align="right">Points</TableCell>
             </TableRow>
           </TableHead>
@@ -57,6 +67,14 @@ export default function StandingsTable({ teams, results, sports = [], showBreakd
                     {row.perSport[s.id] ?? "–"}
                   </TableCell>
                 ))}
+                {anyStats && (
+                  <>
+                    <TableCell align="right">{row.stats?.played ?? "–"}</TableCell>
+                    <TableCell align="right">{row.stats?.won ?? "–"}</TableCell>
+                    <TableCell align="right">{row.stats?.drawn ?? "–"}</TableCell>
+                    <TableCell align="right">{row.stats?.lost ?? "–"}</TableCell>
+                  </>
+                )}
                 <TableCell align="right">
                   <Chip size="small" color={anyPoints && row.rank === 1 ? "primary" : "default"} label={row.total} />
                 </TableCell>

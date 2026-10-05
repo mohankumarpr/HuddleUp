@@ -20,6 +20,11 @@ service cloud.firestore {
         get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'owner';
     }
 
+    function isOrgMemberOfOrg(orgId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
     function teamRepDoc(eventId) {
       return get(/databases/$(database)/documents/events/$(eventId)/teamReps/$(request.auth.uid));
     }
@@ -46,19 +51,50 @@ service cloud.firestore {
 
     // ---------- Organizations ----------
     match /organizations/{orgId} {
-      allow read: if isSignedIn() &&
-        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+      allow read: if isOrgMemberOfOrg(orgId);
       allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
       allow update, delete: if isOrgOwner(orgId);
 
       match /members/{uid} {
-        allow read: if isSignedIn() &&
-          exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+        allow read: if isOrgMemberOfOrg(orgId);
         // Bootstrap: a user may create their own OWNER membership doc only when they also
         // own the parent org doc (both writes happen in one client-side batch on sign-up).
-        allow create: if isSignedIn() && request.auth.uid == uid &&
-          get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerUid == request.auth.uid;
+        // Co-organizer path: an invited (not-yet-member) account may instead create its own
+        // 'organizer' membership by pointing at a pending invite doc whose email matches its own
+        // sign-in email -- see acceptInvite() in utils/firebase/invites.js.
+        allow create: if isSignedIn() && request.auth.uid == uid && (
+          get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerUid == request.auth.uid ||
+          (
+            hasAuthEmail() &&
+            request.resource.data.role == 'organizer' &&
+            request.resource.data.inviteId is string &&
+            get(/databases/$(database)/documents/organizations/$(orgId)/invites/$(request.resource.data.inviteId)).data.emailLower == authEmailLower() &&
+            get(/databases/$(database)/documents/organizations/$(orgId)/invites/$(request.resource.data.inviteId)).data.status == 'pending'
+          )
+        );
         allow update, delete: if isOrgOwner(orgId);
+      }
+
+      // Co-organizer invites: created by the owner, readable by ID (so the invite-acceptance
+      // page works before the invitee has an account), accepted by the invitee themself.
+      match /invites/{inviteId} {
+        allow get: if true;
+        allow list: if isOrgOwner(orgId);
+        allow create: if isOrgOwner(orgId) && request.resource.data.status == 'pending';
+        allow update: if
+          (
+            isOrgOwner(orgId) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+            request.resource.data.status == 'revoked'
+          ) || (
+            hasAuthEmail() &&
+            authEmailLower() == resource.data.emailLower &&
+            resource.data.status == 'pending' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedBy']) &&
+            request.resource.data.status == 'accepted' &&
+            request.resource.data.acceptedBy == request.auth.uid
+          );
+        allow delete: if isOrgOwner(orgId);
       }
     }
 
