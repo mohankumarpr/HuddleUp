@@ -15,6 +15,8 @@ const FRIENDLY_MESSAGES = {
   "auth/invalid-email": "That doesn't look like a valid email address.",
   "auth/weak-password": "Choose a password with at least 6 characters.",
   "auth/too-many-requests": "Too many attempts. Please wait a moment and try again.",
+  "auth/invalid-action-code": "This reset link is invalid or has already been used. Request a new one.",
+  "auth/expired-action-code": "This reset link has expired. Request a new one.",
   NOT_LIVE: "The auction isn't live right now.",
   ALREADY_HIGH_BIDDER: "Your team already holds the highest bid.",
   INSUFFICIENT_PURSE: "Your remaining purse can't cover the next bid increment.",

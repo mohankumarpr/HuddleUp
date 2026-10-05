@@ -8,6 +8,8 @@ import Home from "./Components/marketing/Home";
 import NotFound from "./Components/NotFound";
 import LoginForm from "./Components/auth/LoginForm";
 import SignupForm from "./Components/auth/SignupForm";
+import ForgotPasswordForm from "./Components/auth/ForgotPasswordForm";
+import ResetPasswordForm from "./Components/auth/ResetPasswordForm";
 import AcceptInvite from "./Components/auth/AcceptInvite";
 import RequireOrganizer from "./Components/auth/RequireOrganizer";
 import DashboardLayout from "./Components/dashboard/DashboardLayout";
@@ -41,6 +43,8 @@ function App() {
 
               <Route path="/login" element={<LoginForm />} />
               <Route path="/signup" element={<SignupForm />} />
+              <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+              <Route path="/reset-password" element={<ResetPasswordForm />} />
               <Route path="/invite/:orgId/:inviteId" element={<AcceptInvite />} />
 
               <Route

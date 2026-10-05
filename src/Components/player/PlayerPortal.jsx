@@ -4,7 +4,7 @@ import { Alert, Avatar, Box, Button, Card, CardContent, Chip, Container, Paper, 
 import EventIcon from "@mui/icons-material/Event";
 import PlaceIcon from "@mui/icons-material/Place";
 import { useAuth } from "../../context/AuthContext";
-import { sendPlayerPasswordReset, signInWithEmail, signOutUser, signUpPlayer } from "../../utils/firebase/auth";
+import { sendPasswordReset, signInWithEmail, signOutUser, signUpPlayer } from "../../utils/firebase/auth";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { getEventBySlug, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import { claimPlayerRecord } from "../../utils/firebase/participants";
@@ -48,7 +48,7 @@ function PortalLogin({ event, onDone }) {
       return;
     }
     try {
-      await sendPlayerPasswordReset(email);
+      await sendPasswordReset(email);
       setInfo("Password reset email sent. Check your inbox.");
     } catch (err) {
       setError(friendlyErrorMessage(err));

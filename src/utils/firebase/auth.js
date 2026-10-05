@@ -1,4 +1,5 @@
 import {
+  confirmPasswordReset,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -6,6 +7,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
+  verifyPasswordResetCode,
 } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "./config";
@@ -50,8 +52,20 @@ export async function signInWithEmail({ email, password }) {
   return cred.user;
 }
 
-export async function sendPlayerPasswordReset(email) {
-  await sendPasswordResetEmail(auth, email);
+// Used by both organizer and player login -- the reset link always lands on our own
+// /reset-password page (branded, in-app) instead of Firebase's default hosted page.
+export async function sendPasswordReset(email) {
+  await sendPasswordResetEmail(auth, email, { url: `${window.location.origin}/reset-password` });
+}
+
+// Validates the oobCode from the reset link and returns the account's email, so the reset
+// page can show "Resetting password for x@y.com" before the user types anything.
+export async function verifyResetCode(oobCode) {
+  return verifyPasswordResetCode(auth, oobCode);
+}
+
+export async function completePasswordReset(oobCode, newPassword) {
+  await confirmPasswordReset(auth, oobCode, newPassword);
 }
 
 export async function signInOrganizer({ email, password }) {

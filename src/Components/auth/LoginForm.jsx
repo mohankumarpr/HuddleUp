@@ -70,7 +70,10 @@ export default function LoginForm() {
             </Button>
           </Box>
 
-          <Typography variant="body2" sx={{ mt: 3, textAlign: "center" }}>
+          <Typography variant="body2" sx={{ mt: 2, textAlign: "center" }}>
+            <Link to="/forgot-password">Forgot password?</Link>
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1, textAlign: "center" }}>
             New here? <Link to="/signup">Create an organizer account</Link>
           </Typography>
         </motion.div>
