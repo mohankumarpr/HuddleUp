@@ -1,9 +1,19 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Avatar, Box, Chip, Paper, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
+import AddAlarmIcon from "@mui/icons-material/AddAlarm";
 import BidTimer from "./BidTimer";
 
-export default function PlayerOnBlockCard({ player, currentPrice, highBidTeam, sportNames, basePrice, deadlineAt, timerSeconds }) {
+export default function PlayerOnBlockCard({
+  player,
+  currentPrice,
+  highBidTeam,
+  sportNames,
+  basePrice,
+  deadlineAt,
+  timerSeconds,
+  onExtendTimer,
+}) {
   if (!player) {
     return (
       <Paper
@@ -50,7 +60,19 @@ export default function PlayerOnBlockCard({ player, currentPrice, highBidTeam, s
               </Typography>
             </Box>
             {deadlineAt && (
-              <BidTimer deadlineAt={deadlineAt} totalSeconds={timerSeconds} />
+              <Stack alignItems="center" spacing={0.5}>
+                <BidTimer deadlineAt={deadlineAt} totalSeconds={timerSeconds} />
+                {onExtendTimer && (
+                  <Button
+                    size="small"
+                    startIcon={<AddAlarmIcon fontSize="small" />}
+                    onClick={onExtendTimer}
+                    sx={{ color: "primary.light", minWidth: 0, px: 1 }}
+                  >
+                    +60s
+                  </Button>
+                )}
+              </Stack>
             )}
             <Box sx={{ textAlign: "center" }}>
               <motion.div key={currentPrice} initial={{ scale: 1.15 }} animate={{ scale: 1 }} transition={{ duration: 0.25 }}>

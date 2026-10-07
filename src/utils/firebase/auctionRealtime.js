@@ -108,6 +108,19 @@ export async function setAuctionStatus(eventId, status, organizerUid) {
   await updateDoc(stateRef(eventId), { status, updatedAt: serverTimestamp(), updatedBy: organizerUid });
 }
 
+// Adds `seconds` to whatever time is currently left on the clock -- not a fresh countdown, the
+// existing remaining time plus this. FieldValue.increment is atomic server-side, so repeated
+// clicks (or two organizer tabs) each land correctly without needing a transaction. No-op target
+// doesn't exist if there's no active timer; callers should only show this when blockDeadlineAt is
+// already set.
+export async function extendBlockTimer(eventId, seconds, organizerUid) {
+  await updateDoc(stateRef(eventId), {
+    blockDeadlineAt: increment(seconds * 1000),
+    updatedAt: serverTimestamp(),
+    updatedBy: organizerUid,
+  });
+}
+
 // Team-rep action -- MUST be a transaction. Two reps tapping "Bid" at the same instant both
 // read-then-write the same state doc; Firestore retries the loser against the winner's
 // already-committed price, so the second bid is always computed relative to the first and can

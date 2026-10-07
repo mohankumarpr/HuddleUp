@@ -30,6 +30,7 @@ import { subscribeToSports } from "../../utils/firebase/events";
 import {
   DEFAULT_LADDER,
   confirmSold,
+  extendBlockTimer,
   getOrCreateAuctionState,
   markUnsold,
   revertLastAction,
@@ -297,6 +298,7 @@ export default function OrganizerConsole() {
           basePrice={currentPlayer ? state?.basePrice : null}
           deadlineAt={state?.blockDeadlineAt}
           timerSeconds={state?.bidTimerSeconds}
+          onExtendTimer={() => run(() => extendBlockTimer(eventId, 60, user.uid))}
         />
       </Box>
 
