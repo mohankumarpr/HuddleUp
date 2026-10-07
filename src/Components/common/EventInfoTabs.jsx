@@ -118,6 +118,16 @@ export default function EventInfoTabs({ teams, sports, results, statsBySport, pl
                     {sport.description}
                   </Typography>
                 )}
+                {sport.format && (
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <b>Format:</b> {sport.format}
+                  </Typography>
+                )}
+                {sport.winningCriteria && (
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <b>Winning criteria:</b> {sport.winningCriteria}
+                  </Typography>
+                )}
                 <Typography variant="subtitle2">Rules</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
                   {sport.rules || "Rules will be shared soon."}

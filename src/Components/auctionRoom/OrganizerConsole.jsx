@@ -9,7 +9,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
   IconButton,
   List,
   ListItem,
@@ -37,26 +36,30 @@ import {
   setAuctionStatus,
   startPlayerOnBlock,
   subscribeToBidsForPlayer,
-  updateIncrementLadder,
+  updateAuctionRules,
 } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { useAuctionRoom } from "./useAuctionRoom";
 import PlayerOnBlockCard from "./PlayerOnBlockCard";
+import AuctionStatsBar from "./AuctionStatsBar";
 import BidHistoryList from "../common/BidHistoryList";
 import SoundToggleButton from "../common/SoundToggleButton";
+import TeamPurseList from "../common/TeamPurseList";
 import LoadingSpinner from "../LoadingSpinner";
 
-function LadderDialog({ open, ladder, onClose, onSave }) {
+function AuctionRulesDialog({ open, ladder, bidTimerSeconds, onClose, onSave }) {
   const [rows, setRows] = useState([]);
+  const [timerSeconds, setTimerSeconds] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (open) {
       setRows((ladder && ladder.length ? ladder : DEFAULT_LADDER).map((r) => ({ upTo: r.upTo, increment: r.increment })));
+      setTimerSeconds(bidTimerSeconds || 0);
       setError(null);
     }
-  }, [open, ladder]);
+  }, [open, ladder, bidTimerSeconds]);
 
   const setRow = (i, key, value) => setRows((r) => r.map((row, idx) => (idx === i ? { ...row, [key]: value } : row)));
 
@@ -68,13 +71,14 @@ function LadderDialog({ open, ladder, onClose, onSave }) {
       setError("Add at least one valid rung (both fields are numbers, increment > 0).");
       return;
     }
+    const cleanTimer = Math.max(0, Number(timerSeconds) || 0);
     setSaving(true);
     setError(null);
     try {
-      await onSave(cleaned.sort((a, b) => a.upTo - b.upTo));
+      await onSave({ incrementLadder: cleaned.sort((a, b) => a.upTo - b.upTo), bidTimerSeconds: cleanTimer });
       onClose();
     } catch (err) {
-      setError(err.message || "Couldn't save the bid increments.");
+      setError(err.message || "Couldn't save the auction rules.");
     } finally {
       setSaving(false);
     }
@@ -82,13 +86,31 @@ function LadderDialog({ open, ladder, onClose, onSave }) {
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Bid increments</DialogTitle>
+      <DialogTitle>Auction rules</DialogTitle>
       <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+        <Typography variant="subtitle2" gutterBottom>
+          Bid timer
+        </Typography>
+        <TextField
+          label="Seconds per player"
+          type="number"
+          size="small"
+          value={timerSeconds}
+          onChange={(e) => setTimerSeconds(e.target.value)}
+          helperText="0 = no timer (you confirm sold/unsold manually, as before). A bid resets the clock."
+          fullWidth
+          sx={{ mb: 3 }}
+        />
+
+        <Typography variant="subtitle2" gutterBottom>
+          Bid increments
+        </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Below each "up to" price, a bid raises the price by that increment. The last rung's increment applies to any
           price above the highest threshold.
         </Typography>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Stack spacing={1.5}>
           {rows.map((row, i) => (
             <Stack key={i} direction="row" spacing={1} alignItems="center">
@@ -139,6 +161,7 @@ export default function OrganizerConsole() {
     currentPlayer,
     highBidTeam,
     poolPlayers,
+    stats,
     soundEnabled,
     toggleSound,
   } = useAuctionRoom(eventId);
@@ -146,7 +169,7 @@ export default function OrganizerConsole() {
   const [bids, setBids] = useState([]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [ladderOpen, setLadderOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   useEffect(() => {
     getOrCreateAuctionState(eventId);
@@ -161,6 +184,22 @@ export default function OrganizerConsole() {
     }
     return subscribeToBidsForPlayer(eventId, state.currentPlayerId, setBids);
   }, [eventId, state?.currentPlayerId]);
+
+  // Auto-pace: when a bid timer is configured, this organizer tab confirms the sale (or marks
+  // unsold if nobody bid) the moment the shared deadline passes. Re-scheduled on every change to
+  // blockDeadlineAt -- a new bid pushes it back, a new player on the block gets its own deadline,
+  // and it's cleared entirely (no-op here) once a sale is confirmed.
+  useEffect(() => {
+    if (!state?.blockDeadlineAt || !state?.currentPlayerId) return undefined;
+    const msLeft = state.blockDeadlineAt - Date.now();
+    const timer = setTimeout(() => {
+      confirmSold(eventId, user.uid).catch(() => {
+        // A second open organizer tab racing the same deadline will find the player already
+        // resolved -- harmless, so this stays silent rather than surfacing a confusing error.
+      });
+    }, Math.max(0, msLeft));
+    return () => clearTimeout(timer);
+  }, [eventId, user.uid, state?.blockDeadlineAt, state?.currentPlayerId]);
 
   function sportNames(sportIds) {
     return (sportIds || []).map((id) => sports.find((s) => s.id === id)?.name).filter(Boolean).join(", ");
@@ -193,14 +232,18 @@ export default function OrganizerConsole() {
         </Typography>
         <Stack direction="row" alignItems="center" spacing={1}>
           <SoundToggleButton enabled={soundEnabled} onToggle={toggleSound} />
-          <Tooltip title="Bid increments">
-            <IconButton size="small" onClick={() => setLadderOpen(true)} aria-label="Edit bid increments">
+          <Tooltip title="Auction rules">
+            <IconButton size="small" onClick={() => setRulesOpen(true)} aria-label="Edit auction rules">
               <SettingsIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Chip label={state?.status?.replace("_", " ") || "not started"} color={isLive ? "success" : "default"} />
         </Stack>
       </Stack>
+
+      <Box sx={{ mb: 3 }}>
+        <AuctionStatsBar stats={stats} />
+      </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -251,6 +294,9 @@ export default function OrganizerConsole() {
           currentPrice={state?.currentPrice}
           highBidTeam={highBidTeam}
           sportNames={sportNames}
+          basePrice={currentPlayer ? state?.basePrice : null}
+          deadlineAt={state?.blockDeadlineAt}
+          timerSeconds={state?.bidTimerSeconds}
         />
       </Box>
 
@@ -305,7 +351,8 @@ export default function OrganizerConsole() {
                       startPlayerOnBlock(
                         eventId,
                         poolPlayers[Math.floor(Math.random() * poolPlayers.length)],
-                        user.uid
+                        user.uid,
+                        state?.bidTimerSeconds
                       )
                     )
                   }
@@ -317,7 +364,11 @@ export default function OrganizerConsole() {
                     <ListItem
                       key={player.id}
                       secondaryAction={
-                        <Button size="small" disabled={busy} onClick={() => run(() => startPlayerOnBlock(eventId, player, user.uid))}>
+                        <Button
+                          size="small"
+                          disabled={busy}
+                          onClick={() => run(() => startPlayerOnBlock(eventId, player, user.uid, state?.bidTimerSeconds))}
+                        >
                           Put on block
                         </Button>
                       }
@@ -338,29 +389,16 @@ export default function OrganizerConsole() {
       <Typography variant="subtitle1" fontWeight={600} gutterBottom>
         Teams
       </Typography>
-      <Grid container spacing={2}>
-        {teams.map((team) => (
-          <Grid item xs={12} sm={6} md={4} key={team.id}>
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1.5}>
-                <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: team.color }} />
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography fontWeight={600}>{team.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Purse {team.purseRemaining} / {team.purseTotal}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <TeamPurseList teams={teams} />
+      </Paper>
 
-      <LadderDialog
-        open={ladderOpen}
+      <AuctionRulesDialog
+        open={rulesOpen}
         ladder={state?.incrementLadder}
-        onClose={() => setLadderOpen(false)}
-        onSave={(ladder) => updateIncrementLadder(eventId, ladder, user.uid)}
+        bidTimerSeconds={state?.bidTimerSeconds}
+        onClose={() => setRulesOpen(false)}
+        onSave={(rules) => updateAuctionRules(eventId, rules, user.uid)}
       />
     </Box>
   );

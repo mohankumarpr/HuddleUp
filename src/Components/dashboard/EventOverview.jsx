@@ -28,6 +28,7 @@ import HowToRegIcon from "@mui/icons-material/HowToReg";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ShareIcon from "@mui/icons-material/Share";
+import SportsTennisIcon from "@mui/icons-material/SportsTennis";
 import { getTeamOwners, subscribeToEvent, subscribeToSports, subscribeToTeams, updateEvent } from "../../utils/firebase/events";
 import { subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToPendingRegistrationCount } from "../../utils/firebase/registrations";
@@ -48,6 +49,7 @@ const NAV = [
   { to: "registrations", label: "Registrations", desc: "Review and approve player sign-ups", icon: <HowToRegIcon />, color: "#10B981" },
   { to: "players", label: "Player pool", desc: "Everyone eligible for the auction", icon: <PersonIcon />, color: "#F59E0B" },
   { to: "import", label: "Bulk upload", desc: "Add many players from a CSV file", icon: <UploadFileIcon />, color: "#0EA5E9" },
+  { to: "fixtures", label: "Fixtures", desc: "Round-robin matches and results per sport", icon: <SportsTennisIcon />, color: "#14B8A6" },
   { to: "standings", label: "Standings", desc: "Enter points for each sport", icon: <EmojiEventsIcon />, color: "#8B5CF6" },
   { to: "console", label: "Live auction console", desc: "Run the auction and confirm sales", icon: <GavelIcon />, color: "#EF4444" },
 ];

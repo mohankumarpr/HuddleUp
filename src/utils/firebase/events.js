@@ -131,6 +131,20 @@ export function subscribeToSports(eventId, callback) {
   return onSnapshot(q, (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
 }
 
+// A sport's optional match format: categories (e.g. "Men", "Women"), each an ordered list of
+// match types (e.g. ["Singles", "Doubles", "Doubles"]) -- every team-vs-team fixture plays exactly
+// this sequence. Drives fixtures.js's round-robin generator. A sport with no categories just has
+// no "Fixtures" section; everything else about it works the same either way.
+export function cleanMatchFormat(matchFormat) {
+  const categories = (matchFormat?.categories || [])
+    .map((c) => ({
+      name: (c.name || "").trim(),
+      matchTypes: (c.matchTypes || []).map((t) => (t || "").trim()).filter(Boolean),
+    }))
+    .filter((c) => c.name && c.matchTypes.length);
+  return { categories };
+}
+
 function sportFields(data) {
   return {
     name: data.name.trim(),
@@ -138,8 +152,16 @@ function sportFields(data) {
     date: data.date || "", // "YYYY-MM-DDTHH:mm" from a datetime-local input, or "" when not scheduled yet
     venue: (data.venue || "").trim(),
     rules: (data.rules || "").trim(),
+    // Free text, organizer-authored -- how this sport is actually played (round robin, knockout,
+    // Swiss, anything) and how a winner is decided. Documentation only: nothing in the app
+    // computes from these, since the shape of "format" varies too much sport to sport to encode
+    // as a fixed set of options. Fixtures (round-robin generate, or add-one-at-a-time) work the
+    // same regardless of what's written here.
+    format: (data.format || "").trim(),
+    winningCriteria: (data.winningCriteria || "").trim(),
     playersPerTeam: toNumberOrNull(data.playersPerTeam),
     maxParticipants: toNumberOrNull(data.maxParticipants),
+    matchFormat: cleanMatchFormat(data.matchFormat),
   };
 }
 
@@ -156,8 +178,11 @@ export async function updateSport(eventId, sportId, patch) {
   if ("description" in patch) next.description = (patch.description || "").trim();
   if ("venue" in patch) next.venue = (patch.venue || "").trim();
   if ("rules" in patch) next.rules = (patch.rules || "").trim();
+  if ("format" in patch) next.format = (patch.format || "").trim();
+  if ("winningCriteria" in patch) next.winningCriteria = (patch.winningCriteria || "").trim();
   if ("playersPerTeam" in patch) next.playersPerTeam = toNumberOrNull(patch.playersPerTeam);
   if ("maxParticipants" in patch) next.maxParticipants = toNumberOrNull(patch.maxParticipants);
+  if ("matchFormat" in patch) next.matchFormat = cleanMatchFormat(patch.matchFormat);
   await updateDoc(doc(db, "events", eventId, "sports", sportId), next);
 }
 

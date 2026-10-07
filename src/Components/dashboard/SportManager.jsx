@@ -17,6 +17,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -25,12 +26,125 @@ import PlaceIcon from "@mui/icons-material/Place";
 import GroupsIcon from "@mui/icons-material/Groups";
 import GavelIcon from "@mui/icons-material/Gavel";
 import SportsScoreIcon from "@mui/icons-material/SportsScore";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { createSport, deleteSport, subscribeToSports, updateSport } from "../../utils/firebase/events";
 import { formatDateTime, participantsLabel } from "../../utils/format";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
-const EMPTY = { name: "", description: "", date: "", venue: "", rules: "", playersPerTeam: "", maxParticipants: "", active: true };
+const EMPTY = {
+  name: "",
+  description: "",
+  date: "",
+  venue: "",
+  rules: "",
+  format: "",
+  winningCriteria: "",
+  playersPerTeam: "",
+  maxParticipants: "",
+  active: true,
+  matchFormat: { categories: [] },
+};
+
+function MatchFormatEditor({ matchFormat, onChange }) {
+  const categories = matchFormat?.categories || [];
+  const [newType, setNewType] = useState({});
+
+  function updateCategories(next) {
+    onChange({ categories: next });
+  }
+  function addCategory() {
+    updateCategories([...categories, { name: "", matchTypes: [] }]);
+  }
+  function removeCategory(idx) {
+    updateCategories(categories.filter((_, i) => i !== idx));
+  }
+  function setCategoryName(idx, name) {
+    updateCategories(categories.map((c, i) => (i === idx ? { ...c, name } : c)));
+  }
+  function addMatchType(idx, type) {
+    if (!type.trim()) return;
+    updateCategories(categories.map((c, i) => (i === idx ? { ...c, matchTypes: [...c.matchTypes, type.trim()] } : c)));
+    setNewType((n) => ({ ...n, [idx]: "" }));
+  }
+  function removeMatchType(catIdx, typeIdx) {
+    updateCategories(
+      categories.map((c, i) => (i === catIdx ? { ...c, matchTypes: c.matchTypes.filter((_, ti) => ti !== typeIdx) } : c))
+    );
+  }
+
+  return (
+    <Box>
+      <Typography variant="subtitle2" gutterBottom>
+        Match format (optional)
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        Define categories (e.g. Men, Women) and the exact sequence of matches every pairing plays. The Fixtures page
+        then generates a round robin -- every team plays every other team this exact sequence once.
+      </Typography>
+      <Stack spacing={2}>
+        {categories.map((category, idx) => (
+          <Paper key={idx} variant="outlined" sx={{ p: 1.5 }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <TextField
+                size="small"
+                label="Category name"
+                placeholder="e.g. Men"
+                value={category.name}
+                onChange={(e) => setCategoryName(idx, e.target.value)}
+                fullWidth
+              />
+              <IconButton size="small" onClick={() => removeCategory(idx)} aria-label={`Remove category ${idx + 1}`}>
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+              {category.matchTypes.map((type, typeIdx) => (
+                <Chip
+                  key={typeIdx}
+                  label={`${typeIdx + 1}. ${type}`}
+                  size="small"
+                  onDelete={() => removeMatchType(idx, typeIdx)}
+                />
+              ))}
+              {category.matchTypes.length === 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  No matches added yet.
+                </Typography>
+              )}
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button size="small" variant="outlined" onClick={() => addMatchType(idx, "Singles")}>
+                + Singles
+              </Button>
+              <Button size="small" variant="outlined" onClick={() => addMatchType(idx, "Doubles")}>
+                + Doubles
+              </Button>
+              <TextField
+                size="small"
+                placeholder="Custom match type"
+                value={newType[idx] || ""}
+                onChange={(e) => setNewType((n) => ({ ...n, [idx]: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addMatchType(idx, newType[idx] || "");
+                  }
+                }}
+              />
+              <Button size="small" onClick={() => addMatchType(idx, newType[idx] || "")}>
+                Add
+              </Button>
+            </Stack>
+          </Paper>
+        ))}
+      </Stack>
+      <Button size="small" startIcon={<AddIcon />} sx={{ mt: categories.length ? 1.5 : 0 }} onClick={addCategory}>
+        Add category
+      </Button>
+    </Box>
+  );
+}
 
 function SportDialog({ open, sport, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
@@ -47,9 +161,12 @@ function SportDialog({ open, sport, onClose, onSave }) {
               date: sport.date || "",
               venue: sport.venue || "",
               rules: sport.rules || "",
+              format: sport.format || "",
+              winningCriteria: sport.winningCriteria || "",
               playersPerTeam: sport.playersPerTeam ?? "",
               maxParticipants: sport.maxParticipants ?? "",
               active: sport.active !== false,
+              matchFormat: sport.matchFormat?.categories?.length ? sport.matchFormat : { categories: [] },
             }
           : EMPTY
       );
@@ -115,6 +232,26 @@ function SportDialog({ open, sport, onClose, onSave }) {
             />
           </Stack>
           <TextField label="Rules" value={form.rules} onChange={set("rules")} multiline minRows={4} fullWidth />
+          <TextField
+            label="Format"
+            placeholder="e.g. Round robin, Knockout, Swiss -- however you're actually running this sport"
+            value={form.format}
+            onChange={set("format")}
+            fullWidth
+          />
+          <TextField
+            label="Winning criteria"
+            placeholder="e.g. Most matches won across the round robin advances"
+            value={form.winningCriteria}
+            onChange={set("winningCriteria")}
+            multiline
+            minRows={2}
+            fullWidth
+          />
+          <MatchFormatEditor
+            matchFormat={form.matchFormat}
+            onChange={(matchFormat) => setForm((f) => ({ ...f, matchFormat }))}
+          />
           {sport && (
             <FormControlLabel
               control={<Switch checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} />}
@@ -147,8 +284,11 @@ export default function SportManager() {
       date: form.date,
       venue: form.venue,
       rules: form.rules,
+      format: form.format,
+      winningCriteria: form.winningCriteria,
       playersPerTeam: form.playersPerTeam,
       maxParticipants: form.maxParticipants,
+      matchFormat: form.matchFormat,
     };
     if (dialog.sport) {
       await updateSport(eventId, dialog.sport.id, { ...data, active: form.active });
@@ -211,6 +351,7 @@ export default function SportManager() {
                     color={sport.date ? "primary" : "default"}
                   />
                   {sport.venue && <Chip size="small" variant="outlined" icon={<PlaceIcon />} label={sport.venue} />}
+                  {sport.format && <Chip size="small" variant="outlined" icon={<EmojiEventsIcon />} label={sport.format} />}
                   {participantsLabel(sport) && (
                     <Chip size="small" variant="outlined" icon={<GroupsIcon />} label={participantsLabel(sport)} />
                   )}
@@ -222,6 +363,15 @@ export default function SportManager() {
                     color={sport.rules ? "success" : "default"}
                   />
                 </Stack>
+                <Button
+                  size="small"
+                  component={RouterLink}
+                  to={`/app/events/${eventId}/fixtures?sport=${sport.id}`}
+                  startIcon={<EmojiEventsIcon fontSize="small" />}
+                  sx={{ mt: 1 }}
+                >
+                  Manage fixtures
+                </Button>
               </Box>
               <IconButton size="small" onClick={() => setDialog({ open: true, sport })} aria-label={`Edit ${sport.name}`}>
                 <EditOutlinedIcon fontSize="small" />

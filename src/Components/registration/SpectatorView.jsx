@@ -8,6 +8,7 @@ import { getEventBySlug, subscribeToSports } from "../../utils/firebase/events";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import { useAuctionRoom } from "../auctionRoom/useAuctionRoom";
 import PlayerOnBlockCard from "../auctionRoom/PlayerOnBlockCard";
+import AuctionStatsBar from "../auctionRoom/AuctionStatsBar";
 import BidHistoryList from "../common/BidHistoryList";
 import SoundToggleButton from "../common/SoundToggleButton";
 import LoadingSpinner from "../LoadingSpinner";
@@ -104,7 +105,14 @@ export default function SpectatorView() {
           currentPrice={room.state?.currentPrice}
           highBidTeam={room.highBidTeam}
           sportNames={sportNames}
+          basePrice={room.currentPlayer ? room.state?.basePrice : null}
+          deadlineAt={room.state?.blockDeadlineAt}
+          timerSeconds={room.state?.bidTimerSeconds}
         />
+
+        <Box sx={{ mt: 2 }}>
+          <AuctionStatsBar stats={room.stats} dark />
+        </Box>
 
         {room.currentPlayer && bids.length > 0 && (
           <Paper

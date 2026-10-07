@@ -1,7 +1,26 @@
 import React, { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { Alert, Box, Button, Chip, Container, LinearProgress, Paper, Stack, Typography } from "@mui/material";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  Collapse,
+  Container,
+  Divider,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { motion } from "framer-motion";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { useAuth } from "../../context/AuthContext";
 import { getEventBySlug, getTeamRep, subscribeToSports } from "../../utils/firebase/events";
 import { nextIncrement, placeBid } from "../../utils/firebase/auctionRealtime";
@@ -9,8 +28,10 @@ import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import { useAuctionRoom } from "../auctionRoom/useAuctionRoom";
 import PlayerOnBlockCard from "../auctionRoom/PlayerOnBlockCard";
+import AuctionStatsBar from "../auctionRoom/AuctionStatsBar";
 import BidHistoryList from "../common/BidHistoryList";
 import SoundToggleButton from "../common/SoundToggleButton";
+import TeamPurseList from "../common/TeamPurseList";
 import LoadingSpinner from "../LoadingSpinner";
 
 export default function TeamBidderView() {
@@ -21,6 +42,8 @@ export default function TeamBidderView() {
   const [sports, setSports] = useState([]);
   const [error, setError] = useState(null);
   const [bidding, setBidding] = useState(false);
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [teamsOpen, setTeamsOpen] = useState(false);
 
   useEffect(() => {
     (async () => setEvent(await getEventBySlug(eventSlug)))();
@@ -70,6 +93,8 @@ export default function TeamBidderView() {
   }
 
   const myTeam = room.teams.find((t) => t.id === teamRep.teamId);
+  const myRoster = room.players.filter((p) => p.status === "sold" && p.soldTeamId === teamRep.teamId);
+  const mySpent = myTeam ? myTeam.purseTotal - myTeam.purseRemaining : 0;
   const isLive = Boolean(room.state?.status === "live" && room.state?.currentPlayerId);
   const alreadyHighBidder = room.state?.currentHighBidTeamId === teamRep.teamId;
   const proposedPrice = room.state ? nextIncrement(room.state.currentPrice, room.state.incrementLadder) : null;
@@ -100,15 +125,31 @@ export default function TeamBidderView() {
         </Stack>
       </Stack>
 
+      <Box sx={{ mb: 2 }}>
+        <AuctionStatsBar stats={room.stats} />
+      </Box>
+
       {myTeam && (
         <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Your purse
-            </Typography>
-            <Typography variant="h6">
-              {myTeam.purseRemaining} / {myTeam.purseTotal}
-            </Typography>
+          <Stack direction="row" spacing={2} sx={{ mb: 1.5 }}>
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Spent
+              </Typography>
+              <Typography variant="h6">{mySpent}</Typography>
+            </Box>
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Remaining
+              </Typography>
+              <Typography variant="h6">{myTeam.purseRemaining}</Typography>
+            </Box>
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Total purse
+              </Typography>
+              <Typography variant="h6">{myTeam.purseTotal}</Typography>
+            </Box>
           </Stack>
           <LinearProgress
             variant="determinate"
@@ -120,6 +161,33 @@ export default function TeamBidderView() {
               "& .MuiLinearProgress-bar": { bgcolor: myTeam.color, borderRadius: 3 },
             }}
           />
+
+          <Button
+            size="small"
+            onClick={() => setRosterOpen((o) => !o)}
+            endIcon={rosterOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ mt: 1.5 }}
+          >
+            My roster ({myRoster.length})
+          </Button>
+          <Collapse in={rosterOpen}>
+            {myRoster.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ px: 1, pb: 1 }}>
+                No players won yet.
+              </Typography>
+            ) : (
+              <List dense disablePadding>
+                {myRoster.map((p) => (
+                  <ListItem key={p.id} disableGutters>
+                    <ListItemAvatar>
+                      <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
+                    </ListItemAvatar>
+                    <ListItemText primary={p.name} secondary={`Bought for ${p.soldPrice}`} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Collapse>
         </Paper>
       )}
 
@@ -135,6 +203,9 @@ export default function TeamBidderView() {
           currentPrice={room.state?.currentPrice}
           highBidTeam={room.highBidTeam}
           sportNames={sportNames}
+          basePrice={room.currentPlayer ? room.state?.basePrice : null}
+          deadlineAt={room.state?.blockDeadlineAt}
+          timerSeconds={room.state?.bidTimerSeconds}
         />
       </Box>
 
@@ -165,6 +236,22 @@ export default function TeamBidderView() {
             : `Bid ${proposedPrice}`}
         </Button>
       </motion.div>
+
+      <Divider sx={{ my: 3 }} />
+
+      <Button
+        size="small"
+        onClick={() => setTeamsOpen((o) => !o)}
+        endIcon={teamsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        sx={{ mb: 1 }}
+      >
+        All teams' purses
+      </Button>
+      <Collapse in={teamsOpen}>
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <TeamPurseList teams={room.teams} highlightTeamId={teamRep.teamId} />
+        </Paper>
+      </Collapse>
     </Container>
   );
 }

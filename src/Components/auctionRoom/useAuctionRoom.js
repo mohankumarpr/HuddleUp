@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { subscribeToAuctionState } from "../../utils/firebase/auctionRealtime";
 import { subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToTeams } from "../../utils/firebase/events";
 import { playBidSound, playSoldSound, useSoundEnabled } from "../../utils/sound";
+import { computeAuctionStats } from "../../utils/auctionStats";
 
 // Shared real-time data source for the organizer console, team bidder view, and public
 // spectator view -- all three render purely from this hook's snapshot, never from local
@@ -63,6 +64,7 @@ export function useAuctionRoom(eventId) {
   const currentPlayer = state?.currentPlayerId ? players.find((p) => p.id === state.currentPlayerId) : null;
   const highBidTeam = state?.currentHighBidTeamId ? teams.find((t) => t.id === state.currentHighBidTeamId) : null;
   const poolPlayers = players.filter((p) => p.status === "pool");
+  const stats = useMemo(() => computeAuctionStats(players), [players]);
 
   return {
     loading: state === undefined,
@@ -72,6 +74,7 @@ export function useAuctionRoom(eventId) {
     currentPlayer,
     highBidTeam,
     poolPlayers,
+    stats,
     soundEnabled,
     toggleSound,
   };

@@ -17,6 +17,7 @@ import EventList from "./Components/dashboard/EventList";
 import EventForm from "./Components/dashboard/EventForm";
 import EventOverview from "./Components/dashboard/EventOverview";
 import SportManager from "./Components/dashboard/SportManager";
+import FixturesManager from "./Components/dashboard/FixturesManager";
 import TeamManager from "./Components/dashboard/TeamManager";
 import RegistrationReviewQueue from "./Components/dashboard/RegistrationReviewQueue";
 import PlayerPool from "./Components/dashboard/PlayerPool";
@@ -61,6 +62,7 @@ function App() {
                 <Route path="events/new" element={<EventForm />} />
                 <Route path="events/:eventId" element={<EventOverview />} />
                 <Route path="events/:eventId/sports" element={<SportManager />} />
+                <Route path="events/:eventId/fixtures" element={<FixturesManager />} />
                 <Route path="events/:eventId/teams" element={<TeamManager />} />
                 <Route path="events/:eventId/registrations" element={<RegistrationReviewQueue />} />
                 <Route path="events/:eventId/players" element={<PlayerPool />} />

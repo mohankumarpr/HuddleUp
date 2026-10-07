@@ -155,6 +155,14 @@ service cloud.firestore {
         allow write: if isOrgMember(eventId);
       }
 
+      // Round-robin fixtures generated from a sport's match format (events/{id}/sports/{id}
+      // .matchFormat), with a winner recorded per match. Public read, same as the schedule it
+      // belongs to; only the organizer generates fixtures or records results.
+      match /fixtures/{fixtureId} {
+        allow read: if true;
+        allow write: if isOrgMember(eventId);
+      }
+
       match /teamReps/{uid} {
         allow read: if isOrgMember(eventId) || request.auth.uid == uid;
         // Join flow: a signed-in (anonymous) user claims their own seat. PIN verification
@@ -181,7 +189,7 @@ service cloud.firestore {
             request.resource.data.currentPlayerId == resource.data.currentPlayerId &&
             request.resource.data.currentPrice > resource.data.currentPrice &&
             request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['currentPrice', 'currentHighBidTeamId', 'currentHighBidderUid', 'version', 'updatedAt'])
+              .hasOnly(['currentPrice', 'currentHighBidTeamId', 'currentHighBidderUid', 'blockDeadlineAt', 'version', 'updatedAt'])
           );
       }
 

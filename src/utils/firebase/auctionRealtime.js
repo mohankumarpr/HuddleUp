@@ -55,6 +55,11 @@ export async function getOrCreateAuctionState(eventId) {
     currentHighBidderUid: null,
     basePrice: 0,
     incrementLadder: DEFAULT_LADDER,
+    // 0 = no timer (organizer paces manually, the original behavior). When set, every bid pushes
+    // the deadline back by this many seconds, so the clock always reflects "time since the last
+    // bid" -- standard auction pacing.
+    bidTimerSeconds: 0,
+    blockDeadlineAt: null,
     round: 0,
     version: 0,
     undo: null,
@@ -65,17 +70,22 @@ export async function getOrCreateAuctionState(eventId) {
   return initial;
 }
 
-// Lets an organizer tune the bid ladder per event instead of being stuck with the hardcoded
-// default -- different events have very different budget scales.
-export async function updateIncrementLadder(eventId, ladder, organizerUid) {
-  await updateDoc(stateRef(eventId), { incrementLadder: ladder, updatedAt: serverTimestamp(), updatedBy: organizerUid });
+// Lets an organizer tune the bid ladder and the per-player countdown per event instead of being
+// stuck with the hardcoded default -- different events have very different budget scales and pace.
+export async function updateAuctionRules(eventId, { incrementLadder, bidTimerSeconds }, organizerUid) {
+  await updateDoc(stateRef(eventId), {
+    incrementLadder,
+    bidTimerSeconds,
+    updatedAt: serverTimestamp(),
+    updatedBy: organizerUid,
+  });
 }
 
 // Organizer-only actions (full write access under Security Rules) -- no transaction needed
 // since only one organizer console drives these at a time and a harmless double-write from two
 // organizer tabs isn't a correctness problem the way a mis-priced sale would be.
 
-export async function startPlayerOnBlock(eventId, player, organizerUid) {
+export async function startPlayerOnBlock(eventId, player, organizerUid, bidTimerSeconds = 0) {
   await updateDoc(stateRef(eventId), {
     status: "live",
     currentPlayerId: player.id,
@@ -83,6 +93,7 @@ export async function startPlayerOnBlock(eventId, player, organizerUid) {
     basePrice: player.basePrice,
     currentHighBidTeamId: null,
     currentHighBidderUid: null,
+    blockDeadlineAt: bidTimerSeconds ? Date.now() + bidTimerSeconds * 1000 : null,
     // Starting a new pick retires any pending undo -- reverting a sale from a few players ago
     // while a new one is already on the block would be confusing, not helpful.
     undo: null,
@@ -128,6 +139,8 @@ export async function placeBid(eventId, teamId, repUid) {
       currentPrice: proposedPrice,
       currentHighBidTeamId: teamId,
       currentHighBidderUid: repUid,
+      // A bid resets the clock, same as a real auctioneer re-starting the count on a new bid.
+      ...(state.bidTimerSeconds ? { blockDeadlineAt: Date.now() + state.bidTimerSeconds * 1000 } : {}),
       version: increment(1),
       updatedAt: serverTimestamp(),
     });
@@ -180,6 +193,7 @@ export async function confirmSold(eventId, organizerUid) {
       currentPrice: 0,
       currentHighBidTeamId: null,
       currentHighBidderUid: null,
+      blockDeadlineAt: null,
       undo,
       version: increment(1),
       updatedAt: serverTimestamp(),
@@ -202,6 +216,7 @@ export async function markUnsold(eventId, organizerUid) {
       currentPrice: 0,
       currentHighBidTeamId: null,
       currentHighBidderUid: null,
+      blockDeadlineAt: null,
       undo: { type: "unsold", playerId: state.currentPlayerId },
       version: increment(1),
       updatedAt: serverTimestamp(),

@@ -1,8 +1,9 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Avatar, Box, Chip, Paper, Stack, Typography } from "@mui/material";
+import BidTimer from "./BidTimer";
 
-export default function PlayerOnBlockCard({ player, currentPrice, highBidTeam, sportNames }) {
+export default function PlayerOnBlockCard({ player, currentPrice, highBidTeam, sportNames, basePrice, deadlineAt, timerSeconds }) {
   if (!player) {
     return (
       <Paper
@@ -45,8 +46,12 @@ export default function PlayerOnBlockCard({ player, currentPrice, highBidTeam, s
               </Typography>
               <Typography variant="body2" sx={{ color: "grey.400" }}>
                 {sportNames(player.sportIds) || "No sport"}
+                {basePrice != null && ` · Base ${basePrice}`}
               </Typography>
             </Box>
+            {deadlineAt && (
+              <BidTimer deadlineAt={deadlineAt} totalSeconds={timerSeconds} />
+            )}
             <Box sx={{ textAlign: "center" }}>
               <motion.div key={currentPrice} initial={{ scale: 1.15 }} animate={{ scale: 1 }} transition={{ duration: 0.25 }}>
                 <Typography variant="h3" fontWeight={800}>
