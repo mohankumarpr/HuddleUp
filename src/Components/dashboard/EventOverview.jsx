@@ -31,6 +31,7 @@ import ShareIcon from "@mui/icons-material/Share";
 import SportsTennisIcon from "@mui/icons-material/SportsTennis";
 import DownloadIcon from "@mui/icons-material/Download";
 import HistoryIcon from "@mui/icons-material/History";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { getTeamOwners, subscribeToEvent, subscribeToSports, subscribeToTeams, updateEvent } from "../../utils/firebase/events";
 import { subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToPendingRegistrationCount } from "../../utils/firebase/registrations";
@@ -273,6 +274,16 @@ export default function EventOverview() {
               sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.4)" }}
             >
               {backingUp ? "Preparing..." : "Download backup"}
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<EditOutlinedIcon />}
+              component={RouterLink}
+              to={`/app/events/${event.id}/edit`}
+              sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.4)" }}
+            >
+              Edit event
             </Button>
           </Stack>
         }

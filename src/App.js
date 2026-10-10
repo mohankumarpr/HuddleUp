@@ -64,6 +64,7 @@ function AppRoutes() {
           <Route path="organizers" element={<OrganizerInvites />} />
           <Route path="events/new" element={<EventForm />} />
           <Route path="events/:eventId" element={<EventOverview />} />
+          <Route path="events/:eventId/edit" element={<EventForm />} />
           <Route path="events/:eventId/sports" element={<SportManager />} />
           <Route path="events/:eventId/fixtures" element={<FixturesManager />} />
           <Route path="events/:eventId/teams" element={<TeamManager />} />

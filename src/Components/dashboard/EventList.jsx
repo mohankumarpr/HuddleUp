@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
@@ -7,7 +7,9 @@ import {
   CardActionArea,
   CardContent,
   Chip,
+  IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { motion } from "framer-motion";
@@ -15,6 +17,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import PlaceIcon from "@mui/icons-material/Place";
 import SportsScoreIcon from "@mui/icons-material/SportsScore";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../context/AuthContext";
 import { subscribeToOrgEvents } from "../../utils/firebase/events";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
@@ -36,6 +39,7 @@ function accentFor(id) {
 
 export default function EventList() {
   const { organization } = useAuth();
+  const navigate = useNavigate();
   const [events, setEvents] = useState(null);
 
   useEffect(() => {
@@ -136,12 +140,26 @@ export default function EventList() {
                           </Stack>
                         </Box>
                       </Stack>
-                      <Chip
-                        label={event.status.replace("_", " ")}
-                        color={STATUS_COLOR[event.status] || "default"}
-                        size="small"
-                        sx={{ flexShrink: 0 }}
-                      />
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
+                        <Chip
+                          label={event.status.replace("_", " ")}
+                          color={STATUS_COLOR[event.status] || "default"}
+                          size="small"
+                        />
+                        <Tooltip title="Edit event">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              navigate(`/app/events/${event.id}/edit`);
+                            }}
+                            aria-label={`Edit ${event.name}`}
+                          >
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
                     </Stack>
                   </CardContent>
                 </CardActionArea>
