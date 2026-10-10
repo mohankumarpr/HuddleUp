@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -11,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./config";
 import { reviewRegistration } from "./registrations";
+import { AppError } from "./errors";
 
 // Players are publicly readable (the spectator screen and auction cards show them), so they carry
 // only non-sensitive fields. Email, phone and address live in playerPrivate/{playerId}, which only
@@ -89,4 +91,21 @@ export async function updatePlayer(eventId, playerId, patch) {
 
 export async function updatePlayerPrivate(eventId, playerId, patch) {
   await setDoc(doc(db, "events", eventId, "playerPrivate", playerId), patch, { merge: true });
+}
+
+// Refuses to remove a player who's sold (their team's purse deduction would have nothing to point
+// at) or currently on the block (the live auction state still references them). Anything else --
+// pool or unsold -- is safe to remove outright, no soft-delete/undo: re-adding a player (manually
+// or via bulk upload) is cheap, unlike a team or sport with fixtures/results tied to it.
+export async function deletePlayer(eventId, playerId) {
+  const ref = doc(db, "events", eventId, "players", playerId);
+  const snap = await getDoc(ref);
+  if (snap.exists() && ["sold", "on_block"].includes(snap.data().status)) {
+    throw new AppError("PLAYER_NOT_REMOVABLE");
+  }
+
+  const batch = writeBatch(db);
+  batch.delete(ref);
+  batch.delete(doc(db, "events", eventId, "playerPrivate", playerId));
+  await batch.commit();
 }

@@ -1,14 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink, useParams, useSearchParams } from "react-router-dom";
-import { Avatar, Box, Button, Chip, CircularProgress, Collapse, IconButton, InputAdornment, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, Collapse, IconButton, InputAdornment, Paper, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import DownloadIcon from "@mui/icons-material/Download";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import HistoryIcon from "@mui/icons-material/History";
 import PersonIcon from "@mui/icons-material/Person";
+import { useAuth } from "../../context/AuthContext";
 import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
-import { subscribeToPlayerPrivate, subscribeToPlayers } from "../../utils/firebase/players";
+import { deletePlayer, subscribeToPlayerPrivate, subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
+import { friendlyErrorMessage } from "../../utils/firebase/errors";
+import { logActivity } from "../../utils/firebase/activityLog";
 import { downloadTextFile } from "../../utils/download";
 import { buildResultsCsv } from "../../utils/resultsExport";
 import BidHistoryList from "../common/BidHistoryList";
@@ -39,6 +43,7 @@ function PlayerBidHistory({ eventId, playerId, teams }) {
 
 export default function PlayerPool() {
   const { eventId } = useParams();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [players, setPlayers] = useState(null);
   const [privateById, setPrivateById] = useState({});
@@ -46,6 +51,7 @@ export default function PlayerPool() {
   const [teams, setTeams] = useState([]);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
   const statusFilter = searchParams.get("status") || "";
 
   function setStatusFilter(value) {
@@ -83,6 +89,17 @@ export default function PlayerPool() {
   function handleExport() {
     const csv = buildResultsCsv({ players, teams, sports, privateById });
     downloadTextFile("player-results.csv", csv);
+  }
+
+  async function handleDelete(player) {
+    if (!window.confirm(`Remove ${player.name} from the player pool? This can't be undone.`)) return;
+    setDeleteError(null);
+    try {
+      await deletePlayer(eventId, player.id);
+      logActivity(eventId, { actorUid: user.uid, action: "player_removed", summary: `Removed ${player.name} from the player pool` });
+    } catch (err) {
+      setDeleteError(friendlyErrorMessage(err));
+    }
   }
 
   if (!players) return <LoadingSpinner />;
@@ -142,6 +159,12 @@ export default function PlayerPool() {
         ))}
       </Stack>
 
+      {deleteError && (
+        <Alert severity="error" onClose={() => setDeleteError(null)} sx={{ mb: 2 }}>
+          {deleteError}
+        </Alert>
+      )}
+
       {players.length === 0 && (
         <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>
           <Typography color="text.secondary">
@@ -195,6 +218,24 @@ export default function PlayerPool() {
                     <HistoryIcon fontSize="small" />
                   </IconButton>
                 )}
+                <Tooltip
+                  title={
+                    ["sold", "on_block"].includes(player.status)
+                      ? "Sold or on-the-block players can't be removed"
+                      : `Remove ${player.name}`
+                  }
+                >
+                  <span>
+                    <IconButton
+                      size="small"
+                      disabled={["sold", "on_block"].includes(player.status)}
+                      onClick={() => handleDelete(player)}
+                      aria-label={`Remove ${player.name}`}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </Stack>
               {hasHistory && (
                 <Collapse in={expanded} unmountOnExit>

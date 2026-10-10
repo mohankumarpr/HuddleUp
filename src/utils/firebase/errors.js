@@ -27,6 +27,7 @@ const FRIENDLY_MESSAGES = {
   INVITE_EMAIL_MISMATCH: "This invite was sent to a different email address. Sign in or sign up with that email to accept it.",
   ALREADY_IN_ANOTHER_ORG: "This account already belongs to a different organization. Accept this invite with a different email instead.",
   TEAM_HAS_SOLD_PLAYERS: "This team has already bought players in the auction and can't be deleted. Unsell those players first if you need to remove the team.",
+  PLAYER_NOT_REMOVABLE: "This player is sold or currently on the auction block and can't be removed. Undo the sale from the auction console first if needed.",
 };
 
 export function friendlyErrorMessage(err) {
