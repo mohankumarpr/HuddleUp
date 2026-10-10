@@ -27,6 +27,7 @@ import FemaleIcon from "@mui/icons-material/Female";
 import PersonIcon from "@mui/icons-material/Person";
 import GroupsIcon from "@mui/icons-material/Groups";
 import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
 import {
   createTeam,
   deleteTeam,
@@ -182,6 +183,7 @@ function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave }) {
 export default function TeamManager() {
   const { eventId } = useParams();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [event, setEvent] = useState(null);
   const [teams, setTeams] = useState(null);
   const [deletedTeams, setDeletedTeams] = useState([]);
@@ -208,7 +210,13 @@ export default function TeamManager() {
   }
 
   async function handleDelete(team) {
-    if (!window.confirm(`Delete ${team.name}? It's moved to "Recently deleted" and can be restored later.`)) return;
+    const ok = await confirm({
+      title: `Delete ${team.name}?`,
+      description: `It's moved to "Recently deleted" and can be restored later.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleteError(null);
     try {
       await deleteTeam(eventId, team.id);
@@ -228,7 +236,12 @@ export default function TeamManager() {
   }
 
   async function resetPin(team) {
-    if (window.confirm(`Generate a new join PIN for ${team.name}? Anyone using the old PIN can't join until they get the new one.`)) {
+    const ok = await confirm({
+      title: `Reset PIN for ${team.name}?`,
+      description: "Anyone using the old PIN can't join until they get the new one.",
+      confirmLabel: "Generate new PIN",
+    });
+    if (ok) {
       await updateTeam(eventId, team.id, { joinPin: randomDigits(4) });
     }
   }

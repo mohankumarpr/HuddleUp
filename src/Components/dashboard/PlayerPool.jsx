@@ -8,6 +8,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import HistoryIcon from "@mui/icons-material/History";
 import PersonIcon from "@mui/icons-material/Person";
 import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
 import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import { deletePlayer, subscribeToPlayerPrivate, subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
@@ -44,6 +45,7 @@ function PlayerBidHistory({ eventId, playerId, teams }) {
 export default function PlayerPool() {
   const { eventId } = useParams();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const [players, setPlayers] = useState(null);
   const [privateById, setPrivateById] = useState({});
@@ -92,7 +94,13 @@ export default function PlayerPool() {
   }
 
   async function handleDelete(player) {
-    if (!window.confirm(`Remove ${player.name} from the player pool? This can't be undone.`)) return;
+    const ok = await confirm({
+      title: `Remove ${player.name}?`,
+      description: "They'll be removed from the player pool. This can't be undone.",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleteError(null);
     try {
       await deletePlayer(eventId, player.id);

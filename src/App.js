@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./App.css";
 import { AuthProvider } from "./context/AuthContext";
+import { ConfirmProvider } from "./context/ConfirmContext";
 import ErrorBoundary from "./Components/common/ErrorBoundary";
 import ConnectivityBanner from "./Components/common/ConnectivityBanner";
 import Navbar from "./Components/Navbar";
@@ -90,16 +91,18 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="wrapper">
-          <Navbar />
-          <ConnectivityBanner />
-          <div className="main-panel">
-            <AppRoutes />
+      <ConfirmProvider>
+        <Router>
+          <div className="wrapper">
+            <Navbar />
+            <ConnectivityBanner />
+            <div className="main-panel">
+              <AppRoutes />
+            </div>
+            <Footer />
           </div>
-          <Footer />
-        </div>
-      </Router>
+        </Router>
+      </ConfirmProvider>
     </AuthProvider>
   );
 }

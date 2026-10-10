@@ -29,6 +29,7 @@ import SportsScoreIcon from "@mui/icons-material/SportsScore";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
 import {
   createSport,
   deleteSport,
@@ -284,6 +285,7 @@ function SportDialog({ open, sport, onClose, onSave }) {
 export default function SportManager() {
   const { eventId } = useParams();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [sports, setSports] = useState(null);
   const [deletedSports, setDeletedSports] = useState([]);
   const [dialog, setDialog] = useState({ open: false, sport: null });
@@ -313,9 +315,13 @@ export default function SportManager() {
   }
 
   async function handleDelete(sport) {
-    if (!window.confirm(`Delete ${sport.name}? It's moved to "Recently deleted" and can be restored later.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Delete ${sport.name}?`,
+      description: `It's moved to "Recently deleted" and can be restored later.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleteError(null);
     try {
       await deleteSport(eventId, sport.id);

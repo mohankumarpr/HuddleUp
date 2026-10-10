@@ -15,6 +15,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import GroupsIcon from "@mui/icons-material/Groups";
 import IconButton from "@mui/material/IconButton";
 import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
 import { subscribeToMembers } from "../../utils/firebase/organizations";
 import { createInvite, revokeInvite, subscribeToPendingInvites } from "../../utils/firebase/invites";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
@@ -23,6 +24,7 @@ import LoadingSpinner from "../LoadingSpinner";
 
 export default function OrganizerInvites() {
   const { user, organization, membership } = useAuth();
+  const confirm = useConfirm();
   const isOwner = membership?.role === "owner";
   const orgId = organization?.id;
 
@@ -62,7 +64,13 @@ export default function OrganizerInvites() {
   }
 
   async function handleRevoke(invite) {
-    if (!window.confirm(`Revoke the invite sent to ${invite.email}?`)) return;
+    const ok = await confirm({
+      title: "Revoke this invite?",
+      description: `The invite sent to ${invite.email} will no longer work.`,
+      confirmLabel: "Revoke",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await revokeInvite(orgId, invite.id);
     } catch (err) {
