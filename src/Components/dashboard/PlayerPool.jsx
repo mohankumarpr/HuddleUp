@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link as RouterLink, useParams } from "react-router-dom";
+import { Link as RouterLink, useParams, useSearchParams } from "react-router-dom";
 import { Avatar, Box, Button, Chip, CircularProgress, Collapse, IconButton, InputAdornment, Paper, Stack, TextField, Typography } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
@@ -22,6 +22,14 @@ const STATUS_COLOR = {
   unsold: "error",
 };
 
+const STATUS_FILTERS = [
+  { value: "", label: "All" },
+  { value: "pool", label: "In pool" },
+  { value: "on_block", label: "On the block" },
+  { value: "sold", label: "Sold" },
+  { value: "unsold", label: "Unsold" },
+];
+
 function PlayerBidHistory({ eventId, playerId, teams }) {
   const [bids, setBids] = useState(null);
   useEffect(() => subscribeToBidsForPlayer(eventId, playerId, setBids), [eventId, playerId]);
@@ -31,12 +39,18 @@ function PlayerBidHistory({ eventId, playerId, teams }) {
 
 export default function PlayerPool() {
   const { eventId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [players, setPlayers] = useState(null);
   const [privateById, setPrivateById] = useState({});
   const [sports, setSports] = useState([]);
   const [teams, setTeams] = useState([]);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const statusFilter = searchParams.get("status") || "";
+
+  function setStatusFilter(value) {
+    setSearchParams(value ? { status: value } : {}, { replace: true });
+  }
 
   useEffect(() => {
     const unsubs = [
@@ -56,13 +70,15 @@ export default function PlayerPool() {
   const teamName = (id) => teams.find((t) => t.id === id)?.name;
 
   const visible = useMemo(() => {
+    if (!players) return players;
     const q = search.trim().toLowerCase();
-    if (!q || !players) return players;
     return players.filter((p) => {
+      if (statusFilter && p.status !== statusFilter) return false;
+      if (!q) return true;
       const priv = privateById[p.id] || {};
       return [p.name, priv.email, priv.contact, priv.block].some((v) => (v || "").toLowerCase().includes(q));
     });
-  }, [players, privateById, search]);
+  }, [players, privateById, search, statusFilter]);
 
   function handleExport() {
     const csv = buildResultsCsv({ players, teams, sports, privateById });
@@ -113,11 +129,30 @@ export default function PlayerPool() {
         InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
       />
 
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+        {STATUS_FILTERS.map((f) => (
+          <Chip
+            key={f.value || "all"}
+            label={f.label}
+            size="small"
+            color={statusFilter === f.value ? "primary" : "default"}
+            variant={statusFilter === f.value ? "filled" : "outlined"}
+            onClick={() => setStatusFilter(f.value)}
+          />
+        ))}
+      </Stack>
+
       {players.length === 0 && (
         <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>
           <Typography color="text.secondary">
             No players yet. Approve registrations or bulk upload a CSV to build the pool.
           </Typography>
+        </Paper>
+      )}
+
+      {players.length > 0 && visible.length === 0 && (
+        <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>
+          <Typography color="text.secondary">No players match this filter.</Typography>
         </Paper>
       )}
 

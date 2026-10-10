@@ -60,7 +60,40 @@ const NAV = [
 
 const STAT_COLORS = ["#6366F1", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#0EA5E9"];
 
-function StatTile({ label, value, hint, icon, color }) {
+function StatTile({ label, value, hint, icon, color, to }) {
+  const content = (
+    <CardContent sx={{ position: "relative" }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+        <Box
+          sx={{
+            width: 28,
+            height: 28,
+            borderRadius: 1.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: `${color}22`,
+            color,
+            "& svg": { fontSize: 16 },
+          }}
+        >
+          {icon}
+        </Box>
+        <Typography variant="caption" color="text.secondary">
+          {label}
+        </Typography>
+      </Stack>
+      <Typography variant="h4" fontWeight={800}>
+        {value}
+      </Typography>
+      {hint && (
+        <Typography variant="caption" color="text.secondary">
+          {hint}
+        </Typography>
+      )}
+    </CardContent>
+  );
+
   return (
     <Card
       variant="outlined"
@@ -74,38 +107,16 @@ function StatTile({ label, value, hint, icon, color }) {
           inset: 0,
           background: `linear-gradient(135deg, ${color}18 0%, transparent 70%)`,
         },
+        ...(to && { transition: "box-shadow 0.2s ease, transform 0.2s ease", "&:hover": { boxShadow: 4, transform: "translateY(-2px)" } }),
       }}
     >
-      <CardContent sx={{ position: "relative" }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-          <Box
-            sx={{
-              width: 28,
-              height: 28,
-              borderRadius: 1.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: `${color}22`,
-              color,
-              "& svg": { fontSize: 16 },
-            }}
-          >
-            {icon}
-          </Box>
-          <Typography variant="caption" color="text.secondary">
-            {label}
-          </Typography>
-        </Stack>
-        <Typography variant="h4" fontWeight={800}>
-          {value}
-        </Typography>
-        {hint && (
-          <Typography variant="caption" color="text.secondary">
-            {hint}
-          </Typography>
-        )}
-      </CardContent>
+      {to ? (
+        <CardActionArea component={RouterLink} to={to} sx={{ height: "100%" }}>
+          {content}
+        </CardActionArea>
+      ) : (
+        content
+      )}
     </Card>
   );
 }
@@ -275,7 +286,13 @@ export default function EventOverview() {
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={6} md={2}>
-          <StatTile label="Teams" value={teams.length} icon={<GroupsIcon fontSize="inherit" />} color={STAT_COLORS[0]} />
+          <StatTile
+            label="Teams"
+            value={teams.length}
+            icon={<GroupsIcon fontSize="inherit" />}
+            color={STAT_COLORS[0]}
+            to={`/app/events/${event.id}/teams`}
+          />
         </Grid>
         <Grid item xs={6} md={2}>
           <StatTile
@@ -284,6 +301,7 @@ export default function EventOverview() {
             hint={`${sports.filter((s) => s.date).length} scheduled`}
             icon={<SportsScoreIcon fontSize="inherit" />}
             color={STAT_COLORS[1]}
+            to={`/app/events/${event.id}/sports`}
           />
         </Grid>
         <Grid item xs={6} md={2}>
@@ -293,16 +311,35 @@ export default function EventOverview() {
             hint={`${count("pool")} in pool`}
             icon={<PersonIcon fontSize="inherit" />}
             color={STAT_COLORS[2]}
+            to={`/app/events/${event.id}/players`}
           />
         </Grid>
         <Grid item xs={6} md={2}>
-          <StatTile label="Pending sign-ups" value={pending} icon={<HowToRegIcon fontSize="inherit" />} color={STAT_COLORS[3]} />
+          <StatTile
+            label="Pending sign-ups"
+            value={pending}
+            icon={<HowToRegIcon fontSize="inherit" />}
+            color={STAT_COLORS[3]}
+            to={`/app/events/${event.id}/registrations`}
+          />
         </Grid>
         <Grid item xs={6} md={2}>
-          <StatTile label="Sold" value={count("sold")} icon={<GavelIcon fontSize="inherit" />} color={STAT_COLORS[4]} />
+          <StatTile
+            label="Sold"
+            value={count("sold")}
+            icon={<GavelIcon fontSize="inherit" />}
+            color={STAT_COLORS[4]}
+            to={`/app/events/${event.id}/players?status=sold`}
+          />
         </Grid>
         <Grid item xs={6} md={2}>
-          <StatTile label="Unsold" value={count("unsold")} icon={<PersonIcon fontSize="inherit" />} color={STAT_COLORS[5]} />
+          <StatTile
+            label="Unsold"
+            value={count("unsold")}
+            icon={<PersonIcon fontSize="inherit" />}
+            color={STAT_COLORS[5]}
+            to={`/app/events/${event.id}/players?status=unsold`}
+          />
         </Grid>
       </Grid>
 
