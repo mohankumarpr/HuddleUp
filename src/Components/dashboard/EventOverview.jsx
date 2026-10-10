@@ -29,10 +29,13 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ShareIcon from "@mui/icons-material/Share";
 import SportsTennisIcon from "@mui/icons-material/SportsTennis";
+import DownloadIcon from "@mui/icons-material/Download";
+import HistoryIcon from "@mui/icons-material/History";
 import { getTeamOwners, subscribeToEvent, subscribeToSports, subscribeToTeams, updateEvent } from "../../utils/firebase/events";
 import { subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToPendingRegistrationCount } from "../../utils/firebase/registrations";
 import { subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
+import { downloadEventBackup } from "../../utils/firebase/backup";
 import { formatDate, formatDateTime, participantsLabel, sortSportsBySchedule } from "../../utils/format";
 import QrCodeButton from "../common/QrCodeButton";
 import StandingsTable from "../common/StandingsTable";
@@ -52,6 +55,7 @@ const NAV = [
   { to: "fixtures", label: "Fixtures", desc: "Round-robin matches and results per sport", icon: <SportsTennisIcon />, color: "#14B8A6" },
   { to: "standings", label: "Standings", desc: "Enter points for each sport", icon: <EmojiEventsIcon />, color: "#8B5CF6" },
   { to: "console", label: "Live auction console", desc: "Run the auction and confirm sales", icon: <GavelIcon />, color: "#EF4444" },
+  { to: "activity", label: "Activity log", desc: "Who did what, and when", icon: <HistoryIcon />, color: "#64748B" },
 ];
 
 const STAT_COLORS = ["#6366F1", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#0EA5E9"];
@@ -165,6 +169,7 @@ export default function EventOverview() {
   const [stats, setStats] = useState({});
   const [pending, setPending] = useState(0);
   const [error, setError] = useState(null);
+  const [backingUp, setBackingUp] = useState(false);
 
   useEffect(() => {
     const unsubs = [
@@ -211,6 +216,18 @@ export default function EventOverview() {
     }
   }
 
+  async function handleBackup() {
+    setError(null);
+    setBackingUp(true);
+    try {
+      await downloadEventBackup(event.id, event.name);
+    } catch (err) {
+      setError(err.message || "Couldn't download the backup.");
+    } finally {
+      setBackingUp(false);
+    }
+  }
+
   const heroSubtitleParts = [event.eventDate && formatDate(event.eventDate), event.venue].filter(Boolean);
 
   return (
@@ -235,6 +252,16 @@ export default function EventOverview() {
               }
             >
               {isLast ? "Event ended" : `Mark as "${STATUS_LABEL[nextStatus]}"`}
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleBackup}
+              disabled={backingUp}
+              sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.4)" }}
+            >
+              {backingUp ? "Preparing..." : "Download backup"}
             </Button>
           </Stack>
         }

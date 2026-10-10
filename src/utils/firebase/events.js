@@ -12,6 +12,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./config";
 import { ensureAnonymousAuth } from "./auth";
@@ -25,10 +26,13 @@ export function randomDigits(length) {
   return out;
 }
 
+// Negative counts (playersPerTeam, maxParticipants) make no sense and would otherwise reach
+// Firestore as-is -- treated the same as "not set" rather than silently flipping the sign, since a
+// typo'd negative is more likely a mistake than an intentional value.
 function toNumberOrNull(value) {
   if (value === "" || value == null) return null;
   const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 // Owners may be stored as an `owners` array (new) or a single legacy `ownerName` string. This
@@ -126,9 +130,21 @@ export function subscribeToOrgEvents(orgId, callback) {
 
 // ---------- Sports ----------
 
-export function subscribeToSports(eventId, callback) {
+// Soft-deleted sports/teams (see deleteSport/deleteTeam below) stay in Firestore with a `deleted`
+// flag instead of being removed outright, so every list in the app needs to filter them out of
+// the "live" view. One shared subscription per collection, split client-side, means an accidental
+// delete can always be undone from the "Recently deleted" panel instead of being gone for good.
+function subscribeToAllSportDocs(eventId, callback) {
   const q = query(collection(db, "events", eventId, "sports"), orderBy("order", "asc"));
   return onSnapshot(q, (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
+
+export function subscribeToSports(eventId, callback) {
+  return subscribeToAllSportDocs(eventId, (all) => callback(all.filter((s) => !s.deleted)));
+}
+
+export function subscribeToDeletedSports(eventId, callback) {
+  return subscribeToAllSportDocs(eventId, (all) => callback(all.filter((s) => s.deleted)));
 }
 
 // A sport's optional match format: categories (e.g. "Men", "Women"), each an ordered list of
@@ -186,20 +202,49 @@ export async function updateSport(eventId, sportId, patch) {
   await updateDoc(doc(db, "events", eventId, "sports", sportId), next);
 }
 
+// Hides the sport from every normal list without touching its fixtures/results -- since the sport
+// doc still exists, nothing else is left dangling. Reversible via restoreSport.
 export async function deleteSport(eventId, sportId) {
-  await deleteDoc(doc(db, "events", eventId, "sports", sportId));
+  await updateDoc(doc(db, "events", eventId, "sports", sportId), { deleted: true, deletedAt: serverTimestamp() });
+}
+
+export async function restoreSport(eventId, sportId) {
+  await updateDoc(doc(db, "events", eventId, "sports", sportId), { deleted: false, deletedAt: null });
+}
+
+// Permanent purge, for the "Recently deleted" panel's "Delete forever" action. Only ever called
+// on a sport that's already soft-deleted, but still cleans up its fixtures/results so nothing is
+// left pointing at a sport id that no longer resolves to anything.
+export async function purgeSport(eventId, sportId) {
+  const fixturesSnap = await getDocs(
+    query(collection(db, "events", eventId, "fixtures"), where("sportId", "==", sportId))
+  );
+
+  const batch = writeBatch(db);
+  fixturesSnap.docs.forEach((d) => batch.delete(d.ref));
+  batch.delete(doc(db, "events", eventId, "results", sportId));
+  batch.delete(doc(db, "events", eventId, "sports", sportId));
+  await batch.commit();
 }
 
 // ---------- Teams ----------
 
-export function subscribeToTeams(eventId, callback) {
+function subscribeToAllTeamDocs(eventId, callback) {
   const q = query(collection(db, "events", eventId, "teams"), orderBy("createdAt", "asc"));
   return onSnapshot(q, (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
 }
 
+export function subscribeToTeams(eventId, callback) {
+  return subscribeToAllTeamDocs(eventId, (all) => callback(all.filter((t) => !t.deleted)));
+}
+
+export function subscribeToDeletedTeams(eventId, callback) {
+  return subscribeToAllTeamDocs(eventId, (all) => callback(all.filter((t) => t.deleted)));
+}
+
 export async function createTeam(eventId, { name, owners, purseTotal, color }, colorIndex = 0) {
   const ref = doc(collection(db, "events", eventId, "teams"));
-  const purse = Number(purseTotal) || 0;
+  const purse = Math.max(0, Number(purseTotal) || 0);
   const cleaned = cleanOwners(owners);
   await setDoc(ref, {
     name: name.trim(),
@@ -219,7 +264,7 @@ export async function createTeam(eventId, { name, owners, purseTotal, color }, c
 // Edits name/owners/color/purse. If the purse total changes, the remaining purse moves by the same
 // amount so money already spent in the auction stays accounted for.
 export async function saveTeamDetails(eventId, team, { name, owners, purseTotal, color }) {
-  const newTotal = Number(purseTotal) || 0;
+  const newTotal = Math.max(0, Number(purseTotal) || 0);
   const spent = (team.purseTotal || 0) - (team.purseRemaining || 0);
   const cleaned = cleanOwners(owners);
   await updateDoc(doc(db, "events", eventId, "teams", team.id), {
@@ -236,7 +281,31 @@ export async function updateTeam(eventId, teamId, patch) {
   await updateDoc(doc(db, "events", eventId, "teams", teamId), patch);
 }
 
+async function assertTeamHasNoSoldPlayers(eventId, teamId) {
+  const soldSnap = await getDocs(
+    query(collection(db, "events", eventId, "players"), where("soldTeamId", "==", teamId), limit(1))
+  );
+  if (!soldSnap.empty) {
+    throw new AppError("TEAM_HAS_SOLD_PLAYERS");
+  }
+}
+
+// Hiding a team that already bought players would be confusing mid-event -- its players would
+// still show "sold" to a team nobody can see in the roster/bidder views. Refuse instead; the
+// organizer can use the auction console's undo (while still available) or unsell the player from
+// the pool first if the sale was a mistake.
 export async function deleteTeam(eventId, teamId) {
+  await assertTeamHasNoSoldPlayers(eventId, teamId);
+  await updateDoc(doc(db, "events", eventId, "teams", teamId), { deleted: true, deletedAt: serverTimestamp() });
+}
+
+export async function restoreTeam(eventId, teamId) {
+  await updateDoc(doc(db, "events", eventId, "teams", teamId), { deleted: false, deletedAt: null });
+}
+
+// Permanent purge, for the "Recently deleted" panel's "Delete forever" action.
+export async function purgeTeam(eventId, teamId) {
+  await assertTeamHasNoSoldPlayers(eventId, teamId);
   await deleteDoc(doc(db, "events", eventId, "teams", teamId));
 }
 

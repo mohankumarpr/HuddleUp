@@ -20,6 +20,7 @@ import { useAuth } from "../../context/AuthContext";
 import { subscribeToSports } from "../../utils/firebase/events";
 import { subscribeToRegistrations } from "../../utils/firebase/registrations";
 import { promoteRegistrationToPlayer, rejectRegistrationRequest } from "../../utils/firebase/players";
+import { logActivity } from "../../utils/firebase/activityLog";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -60,6 +61,11 @@ export default function RegistrationReviewQueue() {
         basePrice: Number(basePrice) || 0,
         reviewerUid: user.uid,
       });
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "registration_approved",
+        summary: `Approved ${approving.name}'s registration`,
+      });
       setApproving(null);
     } catch (err) {
       setError(err.message || "Couldn't approve this registration.");
@@ -68,6 +74,11 @@ export default function RegistrationReviewQueue() {
 
   async function handleReject(registration) {
     await rejectRegistrationRequest(eventId, registration, user.uid);
+    logActivity(eventId, {
+      actorUid: user.uid,
+      action: "registration_rejected",
+      summary: `Rejected ${registration.name}'s registration`,
+    });
   }
 
   if (!registrations) return <LoadingSpinner />;

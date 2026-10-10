@@ -39,7 +39,7 @@ export function buildPlayerDocs({ name, photoUrl, sportIds, basePrice, gender, a
       name: name.trim(),
       photoUrl: photoUrl || null,
       sportIds: sportIds || [],
-      basePrice: Number(basePrice) || 0,
+      basePrice: Math.max(0, Number(basePrice) || 0),
       gender: gender || "",
       aboutMe: (aboutMe || "").trim(),
       source: source || "registration",

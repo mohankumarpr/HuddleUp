@@ -26,6 +26,7 @@ const FRIENDLY_MESSAGES = {
   INVITE_NOT_FOUND: "This invite link is no longer valid -- it may have been revoked or already used.",
   INVITE_EMAIL_MISMATCH: "This invite was sent to a different email address. Sign in or sign up with that email to accept it.",
   ALREADY_IN_ANOTHER_ORG: "This account already belongs to a different organization. Accept this invite with a different email instead.",
+  TEAM_HAS_SOLD_PLAYERS: "This team has already bought players in the auction and can't be deleted. Unsell those players first if you need to remove the team.",
 };
 
 export function friendlyErrorMessage(err) {

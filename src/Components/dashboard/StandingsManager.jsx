@@ -20,8 +20,10 @@ import {
 } from "@mui/material";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
+import { useAuth } from "../../context/AuthContext";
 import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import { saveResults, saveSportStats, subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
+import { logActivity } from "../../utils/firebase/activityLog";
 import { sortSportsBySchedule } from "../../utils/format";
 import { computePositionPoints } from "../../utils/positionPoints";
 import StandingsTable from "../common/StandingsTable";
@@ -33,6 +35,7 @@ const POSITION_LABELS = { 1: "1st", 2: "2nd", 3: "3rd" };
 
 export default function StandingsManager() {
   const { eventId } = useParams();
+  const { user } = useAuth();
   const location = useLocation();
   const [sports, setSports] = useState(null);
   const [teams, setTeams] = useState(null);
@@ -131,6 +134,11 @@ export default function StandingsManager() {
         matrix[sportId] = row;
       });
       await saveResults(eventId, matrix, dirtySportIds);
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "standings_published",
+        summary: `Published points for ${dirtySportIds.length} sport${dirtySportIds.length === 1 ? "" : "s"}`,
+      });
       setDraft({});
       setMessage("Standings saved");
     } catch (err) {

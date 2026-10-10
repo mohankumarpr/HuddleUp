@@ -32,8 +32,10 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import { useAuth } from "../../context/AuthContext";
 import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import { addFixture, clearFixtures, deleteFixture, generateFixtures, setFixtureWinner, subscribeToFixtures } from "../../utils/firebase/fixtures";
+import { logActivity } from "../../utils/firebase/activityLog";
 import { computeMatchWins, rankTeamsByWins } from "../../utils/fixtures";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
@@ -128,6 +130,7 @@ function AddFixtureDialog({ open, teams, onClose, onSave }) {
 
 export default function FixturesManager() {
   const { eventId } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [sports, setSports] = useState(null);
@@ -204,7 +207,10 @@ export default function FixturesManager() {
 
   async function handleClear() {
     if (!window.confirm(`Clear all fixtures for ${sport.name}? Every recorded result will be lost.`)) return;
-    await run(() => clearFixtures(eventId, sportId));
+    await run(async () => {
+      await clearFixtures(eventId, sportId);
+      logActivity(eventId, { actorUid: user.uid, action: "fixtures_cleared", summary: `Cleared fixtures for ${sport.name}` });
+    });
   }
 
   async function handleDeleteFixture(fixtureId) {

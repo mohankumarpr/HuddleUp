@@ -27,7 +27,18 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import GavelIcon from "@mui/icons-material/Gavel";
 import SportsScoreIcon from "@mui/icons-material/SportsScore";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
-import { createSport, deleteSport, subscribeToSports, updateSport } from "../../utils/firebase/events";
+import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
+import { useAuth } from "../../context/AuthContext";
+import {
+  createSport,
+  deleteSport,
+  restoreSport,
+  subscribeToDeletedSports,
+  subscribeToSports,
+  updateSport,
+} from "../../utils/firebase/events";
+import { friendlyErrorMessage } from "../../utils/firebase/errors";
+import { logActivity } from "../../utils/firebase/activityLog";
 import { formatDateTime, participantsLabel } from "../../utils/format";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
@@ -272,10 +283,14 @@ function SportDialog({ open, sport, onClose, onSave }) {
 
 export default function SportManager() {
   const { eventId } = useParams();
+  const { user } = useAuth();
   const [sports, setSports] = useState(null);
+  const [deletedSports, setDeletedSports] = useState([]);
   const [dialog, setDialog] = useState({ open: false, sport: null });
+  const [deleteError, setDeleteError] = useState(null);
 
   useEffect(() => subscribeToSports(eventId, setSports), [eventId]);
+  useEffect(() => subscribeToDeletedSports(eventId, setDeletedSports), [eventId]);
 
   async function handleSave(form) {
     const data = {
@@ -298,8 +313,24 @@ export default function SportManager() {
   }
 
   async function handleDelete(sport) {
-    if (window.confirm(`Delete ${sport.name}? Players who picked it keep their registration, but the sport is removed.`)) {
+    if (!window.confirm(`Delete ${sport.name}? It's moved to "Recently deleted" and can be restored later.`)) {
+      return;
+    }
+    setDeleteError(null);
+    try {
       await deleteSport(eventId, sport.id);
+      logActivity(eventId, { actorUid: user.uid, action: "sport_deleted", summary: `Deleted sport ${sport.name}` });
+    } catch (err) {
+      setDeleteError(friendlyErrorMessage(err));
+    }
+  }
+
+  async function handleRestore(sport) {
+    setDeleteError(null);
+    try {
+      await restoreSport(eventId, sport.id);
+    } catch (err) {
+      setDeleteError(friendlyErrorMessage(err));
     }
   }
 
@@ -324,6 +355,12 @@ export default function SportManager() {
           </Button>
         }
       />
+
+      {deleteError && (
+        <Alert severity="error" onClose={() => setDeleteError(null)} sx={{ mb: 2 }}>
+          {deleteError}
+        </Alert>
+      )}
 
       <Stack spacing={1.5}>
         {sports.length === 0 && <Typography color="text.secondary">No sports added yet.</Typography>}
@@ -383,6 +420,24 @@ export default function SportManager() {
           </Paper>
         ))}
       </Stack>
+
+      {deletedSports.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+            Recently deleted
+          </Typography>
+          <Stack spacing={1}>
+            {deletedSports.map((sport) => (
+              <Paper key={sport.id} variant="outlined" sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1.5, opacity: 0.75 }}>
+                <Typography sx={{ flexGrow: 1 }}>{sport.name}</Typography>
+                <Button size="small" startIcon={<RestoreFromTrashIcon />} onClick={() => handleRestore(sport)}>
+                  Restore
+                </Button>
+              </Paper>
+            ))}
+          </Stack>
+        </Box>
+      )}
 
       <SportDialog
         open={dialog.open}

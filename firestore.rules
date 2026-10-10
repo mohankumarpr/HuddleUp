@@ -122,7 +122,22 @@ service cloud.firestore {
 
       match /registrations/{regId} {
         allow read, update, delete: if isOrgMember(eventId);
-        allow create: if true; // public registration form, no login required
+        // Public registration form, no login required -- so this is the one write path on the
+        // whole site open to total strangers. Shape/size bounds stop garbage or huge payloads;
+        // the optional honeypot field (see PublicRegistrationForm.jsx) catches bots simple enough
+        // to auto-fill every input on the page. Neither stops a bot that crafts its own
+        // Firestore write directly -- there's no server here to verify anything further.
+        allow create: if request.resource.data.status == 'pending' &&
+          request.resource.data.name is string &&
+          request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200 &&
+          (!('contact' in request.resource.data) || (request.resource.data.contact is string && request.resource.data.contact.size() <= 50)) &&
+          (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 200)) &&
+          (!('block' in request.resource.data) || (request.resource.data.block is string && request.resource.data.block.size() <= 100)) &&
+          (!('aboutMe' in request.resource.data) || (request.resource.data.aboutMe is string && request.resource.data.aboutMe.size() <= 1000)) &&
+          (!('sportIds' in request.resource.data) || (request.resource.data.sportIds is list && request.resource.data.sportIds.size() <= 50)) &&
+          (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl == null ||
+            (request.resource.data.photoUrl is string && request.resource.data.photoUrl.size() <= 450000)) &&
+          (!('honeypot' in request.resource.data) || request.resource.data.honeypot == '');
       }
 
       match /players/{playerId} {
@@ -197,6 +212,13 @@ service cloud.firestore {
         allow read: if true;
         allow create: if isOrgMember(eventId) || isTeamRepFor(eventId, request.resource.data.teamId);
         allow update, delete: if false; // append-only audit trail
+      }
+
+      // Who did what, for the organizer to review after the fact. Organizer-only, append-only --
+      // never shown to anyone outside the org, and never editable once written.
+      match /activityLog/{entryId} {
+        allow read, create: if isOrgMember(eventId);
+        allow update, delete: if false;
       }
     }
   }

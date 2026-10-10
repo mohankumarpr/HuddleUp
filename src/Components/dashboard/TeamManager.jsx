@@ -21,20 +21,26 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
+import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import MaleIcon from "@mui/icons-material/Male";
 import FemaleIcon from "@mui/icons-material/Female";
 import PersonIcon from "@mui/icons-material/Person";
 import GroupsIcon from "@mui/icons-material/Groups";
+import { useAuth } from "../../context/AuthContext";
 import {
   createTeam,
   deleteTeam,
   getTeamOwners,
   randomDigits,
+  restoreTeam,
   saveTeamDetails,
+  subscribeToDeletedTeams,
   subscribeToEvent,
   subscribeToTeams,
   updateTeam,
 } from "../../utils/firebase/events";
+import { friendlyErrorMessage } from "../../utils/firebase/errors";
+import { logActivity } from "../../utils/firebase/activityLog";
 import QrCodeButton from "../common/QrCodeButton";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
@@ -175,16 +181,21 @@ function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave }) {
 
 export default function TeamManager() {
   const { eventId } = useParams();
+  const { user } = useAuth();
   const [event, setEvent] = useState(null);
   const [teams, setTeams] = useState(null);
+  const [deletedTeams, setDeletedTeams] = useState([]);
   const [dialog, setDialog] = useState({ open: false, team: null });
+  const [deleteError, setDeleteError] = useState(null);
 
   useEffect(() => {
     const unsubEvent = subscribeToEvent(eventId, setEvent);
     const unsubTeams = subscribeToTeams(eventId, setTeams);
+    const unsubDeleted = subscribeToDeletedTeams(eventId, setDeletedTeams);
     return () => {
       unsubEvent();
       unsubTeams();
+      unsubDeleted();
     };
   }, [eventId]);
 
@@ -197,7 +208,23 @@ export default function TeamManager() {
   }
 
   async function handleDelete(team) {
-    if (window.confirm(`Delete ${team.name}? This can't be undone.`)) await deleteTeam(eventId, team.id);
+    if (!window.confirm(`Delete ${team.name}? It's moved to "Recently deleted" and can be restored later.`)) return;
+    setDeleteError(null);
+    try {
+      await deleteTeam(eventId, team.id);
+      logActivity(eventId, { actorUid: user.uid, action: "team_deleted", summary: `Deleted team ${team.name}` });
+    } catch (err) {
+      setDeleteError(friendlyErrorMessage(err));
+    }
+  }
+
+  async function handleRestore(team) {
+    setDeleteError(null);
+    try {
+      await restoreTeam(eventId, team.id);
+    } catch (err) {
+      setDeleteError(friendlyErrorMessage(err));
+    }
   }
 
   async function resetPin(team) {
@@ -227,6 +254,12 @@ export default function TeamManager() {
           </Button>
         }
       />
+
+      {deleteError && (
+        <Alert severity="error" onClose={() => setDeleteError(null)} sx={{ mb: 2 }}>
+          {deleteError}
+        </Alert>
+      )}
 
       <Stack spacing={1.5}>
         {teams.length === 0 && <Typography color="text.secondary">No teams added yet.</Typography>}
@@ -283,6 +316,25 @@ export default function TeamManager() {
           );
         })}
       </Stack>
+
+      {deletedTeams.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+            Recently deleted
+          </Typography>
+          <Stack spacing={1}>
+            {deletedTeams.map((team) => (
+              <Paper key={team.id} variant="outlined" sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1.5, opacity: 0.75 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: team.color, flexShrink: 0 }} />
+                <Typography sx={{ flexGrow: 1 }}>{team.name}</Typography>
+                <Button size="small" startIcon={<RestoreFromTrashIcon />} onClick={() => handleRestore(team)}>
+                  Restore
+                </Button>
+              </Paper>
+            ))}
+          </Stack>
+        </Box>
+      )}
 
       <TeamDialog
         open={dialog.open}

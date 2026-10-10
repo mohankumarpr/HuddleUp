@@ -57,6 +57,9 @@ export default function PublicRegistrationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  // Invisible to a real visitor; a bot that blindly fills every field on the page trips it, and
+  // we just pretend the submission worked instead of writing it (see handleSubmit).
+  const [honeypot, setHoneypot] = useState("");
 
   useEffect(() => {
     let unsubSports;
@@ -91,9 +94,33 @@ export default function PublicRegistrationForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+
+    if (honeypot) {
+      // A bot filled in the hidden field -- pretend it worked so it doesn't retry, without
+      // touching Firestore at all.
+      setSubmitted(true);
+      return;
+    }
+
+    const throttleKey = `regSubmittedAt:${event.id}`;
+    try {
+      const lastSubmittedAt = Number(localStorage.getItem(throttleKey) || 0);
+      if (Date.now() - lastSubmittedAt < 60_000) {
+        setError("You just submitted a registration for this event. Please wait a minute before submitting another.");
+        return;
+      }
+    } catch {
+      // Storage unavailable (private browsing, blocked site data) -- just skip the throttle.
+    }
+
     setSubmitting(true);
     try {
       await submitRegistration(event.id, { name, contact, email, gender, block, aboutMe, sportIds, photoUrl: photoDataUrl });
+      try {
+        localStorage.setItem(throttleKey, String(Date.now()));
+      } catch {
+        // Nothing to do -- the throttle is a courtesy, not a guarantee.
+      }
       setSubmitted(true);
     } catch (err) {
       setError(err.message || "Couldn't submit your registration. Please try again.");
@@ -175,6 +202,16 @@ export default function PublicRegistrationForm() {
 
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={3}>
+                <TextField
+                  label="Company website"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  sx={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }}
+                />
+
                 <Stack direction="row" spacing={2} alignItems="center">
                   <Avatar src={photoDataUrl} sx={{ width: 64, height: 64, bgcolor: "action.disabledBackground" }} />
                   <Box>

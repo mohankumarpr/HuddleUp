@@ -40,6 +40,7 @@ import {
   updateAuctionRules,
 } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
+import { logActivity } from "../../utils/firebase/activityLog";
 import { useAuctionRoom } from "./useAuctionRoom";
 import PlayerOnBlockCard from "./PlayerOnBlockCard";
 import AuctionStatsBar from "./AuctionStatsBar";
@@ -193,13 +194,29 @@ export default function OrganizerConsole() {
   useEffect(() => {
     if (!state?.blockDeadlineAt || !state?.currentPlayerId) return undefined;
     const msLeft = state.blockDeadlineAt - Date.now();
+    const playerName = currentPlayer?.name;
+    const teamName = highBidTeam?.name;
+    const price = state?.currentPrice;
     const timer = setTimeout(() => {
-      confirmSold(eventId, user.uid).catch(() => {
-        // A second open organizer tab racing the same deadline will find the player already
-        // resolved -- harmless, so this stays silent rather than surfacing a confusing error.
-      });
+      confirmSold(eventId, user.uid)
+        .then(() => {
+          logActivity(eventId, {
+            actorUid: user.uid,
+            action: "player_sold",
+            summary: teamName ? `Sold ${playerName} to ${teamName} for ${price} (timer expired)` : `${playerName} went unsold (timer expired, no bids)`,
+          });
+        })
+        .catch(() => {
+          // A second open organizer tab racing the same deadline will find the player already
+          // resolved -- harmless, so this stays silent rather than surfacing a confusing error.
+        });
     }, Math.max(0, msLeft));
     return () => clearTimeout(timer);
+    // currentPlayer/highBidTeam/currentPrice are read only to label the log entry when the timer
+    // fires, not to decide whether to (re)schedule it -- blockDeadlineAt already changes on every
+    // bid and every new player, so keying off that alone is correct and avoids rescheduling the
+    // timeout on every bid-price re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, user.uid, state?.blockDeadlineAt, state?.currentPlayerId]);
 
   function sportNames(sportIds) {
@@ -262,7 +279,16 @@ export default function OrganizerConsole() {
               color="inherit"
               startIcon={<UndoIcon />}
               disabled={busy}
-              onClick={() => run(() => revertLastAction(eventId, user.uid))}
+              onClick={() => {
+                const summary =
+                  undo.type === "sold"
+                    ? `Undid sale of ${undoPlayerName || "a player"} to ${undoTeamName || "a team"}`
+                    : `Undid unsold mark on ${undoPlayerName || "a player"}`;
+                run(async () => {
+                  await revertLastAction(eventId, user.uid);
+                  logActivity(eventId, { actorUid: user.uid, action: "action_undone", summary });
+                });
+              }}
             >
               Undo
             </Button>
@@ -318,7 +344,19 @@ export default function OrganizerConsole() {
             color="success"
             size="large"
             disabled={busy}
-            onClick={() => run(() => confirmSold(eventId, user.uid))}
+            onClick={() => {
+              const playerName = currentPlayer?.name;
+              const teamName = highBidTeam?.name;
+              const price = state?.currentPrice;
+              run(async () => {
+                await confirmSold(eventId, user.uid);
+                logActivity(eventId, {
+                  actorUid: user.uid,
+                  action: "player_sold",
+                  summary: teamName ? `Sold ${playerName} to ${teamName} for ${price}` : `${playerName} went unsold (no bids)`,
+                });
+              });
+            }}
           >
             {highBidTeam ? `Confirm SOLD to ${highBidTeam.name}` : "Confirm (no bids -> unsold)"}
           </Button>
@@ -327,7 +365,13 @@ export default function OrganizerConsole() {
             color="error"
             size="large"
             disabled={busy}
-            onClick={() => run(() => markUnsold(eventId, user.uid))}
+            onClick={() => {
+              const playerName = currentPlayer?.name;
+              run(async () => {
+                await markUnsold(eventId, user.uid);
+                logActivity(eventId, { actorUid: user.uid, action: "player_unsold", summary: `Marked ${playerName} unsold` });
+              });
+            }}
           >
             Mark unsold
           </Button>
