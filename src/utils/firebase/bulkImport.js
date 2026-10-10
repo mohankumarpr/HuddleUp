@@ -26,9 +26,12 @@ export function normalizeKey(text) {
   return String(text || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// Google Forms headers are rarely just "Block" or "About" -- they're usually a full question
+// ("Block and Unit Number (Ex UNICO - X01)", "Short Description About Yourself"). A substring
+// match against the same alias lists catches those without needing a longer alias list per field.
 function fieldForHeader(header) {
   const key = normalizeKey(header);
-  return Object.keys(HEADER_ALIASES).find((field) => HEADER_ALIASES[field].includes(key)) || null;
+  return Object.keys(HEADER_ALIASES).find((field) => HEADER_ALIASES[field].some((alias) => key.includes(alias))) || null;
 }
 
 function normalizeGender(value) {
@@ -52,6 +55,49 @@ export function parseCsvFile(file) {
   });
 }
 
+// Reads the first sheet of an .xlsx/.xls workbook (e.g. a Google Forms response export) straight
+// in the browser -- no server/conversion step needed. Returns the same { rows, headers } shape as
+// parseCsvFile so the rest of the import pipeline doesn't care which format the file was. The xlsx
+// library is sizeable, so it's only fetched (as its own chunk) when someone actually uploads a
+// spreadsheet, instead of bloating every visitor's initial bundle.
+export async function parseXlsxFile(file) {
+  const XLSX = await import("xlsx");
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const workbook = XLSX.read(e.target.result, { type: "array", cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        // Build row objects ourselves, keyed by the *trimmed* header -- sheet_to_json's own
+        // object-key mode keys each row by the literal (untrimmed) header cell, which silently
+        // orphans every column whose header has leading/trailing whitespace (common in Google
+        // Forms exports, e.g. "Skill level in Badminton ") the moment anything downstream looks
+        // the value up by the trimmed name.
+        const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" });
+        const headers = (grid[0] || []).map((h) => String(h ?? "").trim()).filter(Boolean);
+        const rows = grid.slice(1).map((rowArray) => {
+          const row = {};
+          headers.forEach((h, i) => {
+            row[h] = rowArray[i] ?? "";
+          });
+          return row;
+        });
+        resolve({ rows, headers });
+      } catch (err) {
+        reject(new Error(`Couldn't read that spreadsheet: ${err.message || err}`));
+      }
+    };
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+export function parseSpreadsheetFile(file) {
+  const name = (file.name || "").toLowerCase();
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) return parseXlsxFile(file);
+  return parseCsvFile(file);
+}
+
 // Pure. Turns raw parsed rows into validated import rows.
 //   sports:            [{id, name}] already configured for the event
 //   existingIdentity:  Set of identity keys for players already in the event (see identityKey)
@@ -61,12 +107,25 @@ export function identityKey({ email, name, contact }) {
   return `n:${normalizeKey(name)}|${normalizeKey(contact)}`;
 }
 
+// Google Forms exports routinely carry columns this app has no field for at all (per-sport skill
+// ratings, a free-text "feedback" box, the form's own Timestamp/Score). The organizer asked for
+// every column to survive the import, not just the ones that map onto a known field -- so instead
+// of dropping them, every column left over after name/email/contact/etc. are pulled out gets
+// appended as plain "Header: value" lines onto aboutMe. Nothing here decides what any of it means
+// (e.g. no attempt is made to turn a skill rating into a sport selection); it's just preserved
+// verbatim for the organizer to read and act on by hand.
+function formatLeftoverValue(value) {
+  if (value instanceof Date) return value.toLocaleString();
+  return String(value ?? "").trim();
+}
+
 export function buildImportRows(rawRows, headers, { sports, existingIdentity, defaultBasePrice }) {
   const sportByName = new Map(sports.map((s) => [normalizeKey(s.name), s]));
   const headerField = new Map(headers.map((h) => [h, fieldForHeader(h)]));
   // Any header that isn't a known field but matches a sport's name is treated as a yes/no column,
   // which is how the old Google Form exported "Want to participate in <sport>".
   const sportFlagHeaders = headers.filter((h) => !headerField.get(h) && sportByName.has(normalizeKey(h)));
+  const leftoverHeaders = headers.filter((h) => !headerField.get(h) && !sportFlagHeaders.includes(h));
 
   const seen = new Set();
 
@@ -82,10 +141,15 @@ export function buildImportRows(rawRows, headers, { sports, existingIdentity, de
     const email = get("email");
     const contact = get("contact");
     const block = get("block");
-    const aboutMe = get("aboutMe");
     const photoUrl = get("photoUrl");
     const genderResult = normalizeGender(get("gender"));
     if (genderResult.warning) warnings.push(genderResult.warning);
+
+    const leftoverLines = leftoverHeaders
+      .map((h) => [h, formatLeftoverValue(raw[h])])
+      .filter(([, value]) => value !== "")
+      .map(([h, value]) => `${h}: ${value}`);
+    const aboutMe = [get("aboutMe"), leftoverLines.join("\n")].filter(Boolean).join("\n\n");
 
     if (!name) errors.push("Name is missing");
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push(`"${email}" is not a valid email`);

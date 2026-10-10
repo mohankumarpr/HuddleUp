@@ -24,7 +24,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { subscribeToSports } from "../../utils/firebase/events";
 import { subscribeToPlayerPrivate, subscribeToPlayers } from "../../utils/firebase/players";
-import { buildImportRows, identityKey, importPlayers, parseCsvFile, templateCsv } from "../../utils/firebase/bulkImport";
+import { buildImportRows, identityKey, importPlayers, parseSpreadsheetFile, templateCsv } from "../../utils/firebase/bulkImport";
 import { downloadTextFile } from "../../utils/download";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
@@ -87,7 +87,7 @@ export default function PlayerImport() {
     setError(null);
     setResult(null);
     try {
-      const data = await parseCsvFile(file);
+      const data = await parseSpreadsheetFile(file);
       if (!data.rows.length) {
         setError("That file has no data rows.");
         return;
@@ -149,8 +149,10 @@ export default function PlayerImport() {
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Columns: <b>name</b> (required), email, contact, gender, block, about_me, <b>sports</b> (separate several with ;
-            or ,), base_price, photo_url. Header names like "Player Name" or "Contact Number" are recognised too, and a
-            column named after a sport with yes/1 in it also works. Using Excel? Save the sheet as CSV first.
+            or ,), base_price, photo_url. Longer header names like "Player Name", "Contact Number", or a full Google Forms
+            question ("Block and Unit Number (Ex UNICO - X01)") are recognised too, and a column named after a sport with
+            yes/1 in it also works. Any other column in your file (skill ratings, feedback, timestamps, etc.) isn't lost --
+            it's kept as extra text on each player's profile. CSV and Excel (.xlsx) files both work directly.
           </Typography>
           <Box>
             <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => downloadTemplate(sports.map((s) => s.name))}>
@@ -163,8 +165,14 @@ export default function PlayerImport() {
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
             <Button variant="contained" component="label" startIcon={<UploadFileIcon />}>
-              Choose CSV file
-              <input type="file" accept=".csv,text/csv" hidden onChange={handleFile} data-testid="csv-input" />
+              Choose CSV or Excel file
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                hidden
+                onChange={handleFile}
+                data-testid="csv-input"
+              />
             </Button>
             {fileName && <Chip label={`${fileName} · ${parsed?.rows.length ?? 0} rows`} onDelete={() => { setParsed(null); setFileName(""); }} />}
             <TextField
