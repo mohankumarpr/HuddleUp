@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link as RouterLink, Outlet } from "react-router-dom";
+import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
 import {
   AppBar,
   Avatar,
@@ -28,6 +28,10 @@ export default function DashboardLayout() {
   const { organization, profile } = useAuth();
   const { mode, toggleMode } = useThemeMode();
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const location = useLocation();
+  // The live auction console needs real screen width to show the pool/sold/unsold columns side by
+  // side -- every other dashboard page is fine at the normal reading width.
+  const isFullWidthPage = /\/console$/.test(location.pathname);
 
   const initials = (profile?.displayName || profile?.email || "?").trim()[0]?.toUpperCase();
 
@@ -141,7 +145,7 @@ export default function DashboardLayout() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 4 } }}>
+      <Container maxWidth={isFullWidthPage ? false : "lg"} sx={{ py: { xs: 2.5, sm: 4 } }}>
         <Outlet />
       </Container>
     </Box>

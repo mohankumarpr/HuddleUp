@@ -47,6 +47,7 @@ export function buildPlayerDocs({ name, photoUrl, sportIds, basePrice, gender, a
       aboutMe: (aboutMe || "").trim(),
       source: source || "registration",
       status: "pool",
+      marquee: false,
       soldTeamId: null,
       soldPrice: null,
       soldAt: null,
@@ -88,6 +89,13 @@ export async function rejectRegistrationRequest(eventId, registration, reviewerU
 
 export async function updatePlayer(eventId, playerId, patch) {
   await updateDoc(doc(db, "events", eventId, "players", playerId), patch);
+}
+
+// Sends an unsold player back into the pool so they can be put on the block again. No purse or
+// team was ever touched for an unsold player, so (unlike returnPlayerToPool for a sold player)
+// this is just a status flip, no transaction needed.
+export async function requeueUnsoldPlayer(eventId, playerId) {
+  await updateDoc(doc(db, "events", eventId, "players", playerId), { status: "pool" });
 }
 
 export async function updatePlayerPrivate(eventId, playerId, patch) {

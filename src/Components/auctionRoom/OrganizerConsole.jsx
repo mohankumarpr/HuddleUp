@@ -9,6 +9,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Grid,
   IconButton,
   List,
   ListItem,
@@ -25,8 +26,11 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import SettingsIcon from "@mui/icons-material/Settings";
 import UndoIcon from "@mui/icons-material/Undo";
+import StarIcon from "@mui/icons-material/Star";
 import { useAuth } from "../../context/AuthContext";
 import { subscribeToSports } from "../../utils/firebase/events";
+import { requeueUnsoldPlayer } from "../../utils/firebase/players";
+import { partitionPoolForAuction } from "../../utils/marquee";
 import {
   DEFAULT_LADDER,
   confirmSold,
@@ -162,6 +166,8 @@ export default function OrganizerConsole() {
     currentPlayer,
     highBidTeam,
     poolPlayers,
+    soldPlayers,
+    unsoldPlayers,
     stats,
     soundEnabled,
     toggleSound,
@@ -262,9 +268,18 @@ export default function OrganizerConsole() {
   const undo = state?.undo;
   const undoPlayerName = undo && players.find((p) => p.id === undo.playerId)?.name;
   const undoTeamName = undo?.type === "sold" && teams.find((t) => t.id === undo.teamId)?.name;
+  const { eligible: eligiblePoolPlayers, heldBack: heldBackPlayers } = partitionPoolForAuction(poolPlayers);
+  const eligibleIds = new Set(eligiblePoolPlayers.map((p) => p.id));
+
+  function handleRequeueUnsold(player) {
+    return run(async () => {
+      await requeueUnsoldPlayer(eventId, player.id);
+      logActivity(eventId, { actorUid: user.uid, action: "player_requeued", summary: `Sent ${player.name} back to the pool` });
+    });
+  }
 
   return (
-    <Box sx={{ maxWidth: 960 }}>
+    <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h5" fontWeight={700}>
           Live auction console
@@ -336,58 +351,154 @@ export default function OrganizerConsole() {
         </Alert>
       )}
 
-      {!currentPlayer && isLive && (
-        <Paper variant="outlined" sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-            Pick the next player ({poolPlayers.length} remaining)
-          </Typography>
-          {poolPlayers.length === 0 ? (
-            <Typography color="text.secondary">
-              No players left in the pool. Approve more registrations to continue.
-            </Typography>
-          ) : (
-            <>
-              <Button
-                variant="contained"
-                sx={{ mb: 2 }}
-                disabled={busy}
-                onClick={() =>
-                  run(() =>
-                    startPlayerOnBlock(
-                      eventId,
-                      poolPlayers[Math.floor(Math.random() * poolPlayers.length)],
-                      user.uid,
-                      state?.bidTimerSeconds
-                    )
-                  )
-                }
-              >
-                Pick random player
-              </Button>
-              <List dense sx={{ maxHeight: 280, overflowY: "auto" }}>
-                {poolPlayers.map((player) => (
-                  <ListItem
-                    key={player.id}
-                    secondaryAction={
-                      <Button
-                        size="small"
-                        disabled={busy}
-                        onClick={() => run(() => startPlayerOnBlock(eventId, player, user.uid, state?.bidTimerSeconds))}
-                      >
-                        Put on block
-                      </Button>
-                    }
-                  >
-                    <ListItemAvatar>
-                      <Avatar src={player.photoUrl} alt={player.name} />
-                    </ListItemAvatar>
-                    <ListItemText primary={player.name} secondary={`Base price ${player.basePrice}`} />
-                  </ListItem>
-                ))}
-              </List>
-            </>
-          )}
-        </Paper>
+      {isLive && (
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={4}>
+            <Paper variant="outlined" sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                Pool ({poolPlayers.length})
+              </Typography>
+              {poolPlayers.length === 0 ? (
+                <Typography color="text.secondary">
+                  No players left in the pool. Approve more registrations to continue.
+                </Typography>
+              ) : (
+                <>
+                  {!currentPlayer && (
+                    <Tooltip
+                      title={
+                        eligiblePoolPlayers.length === 0
+                          ? "Every remaining player is a held-back marquee player"
+                          : ""
+                      }
+                    >
+                      <span>
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          sx={{ mb: 2 }}
+                          disabled={busy || eligiblePoolPlayers.length === 0}
+                          onClick={() =>
+                            run(() =>
+                              startPlayerOnBlock(
+                                eventId,
+                                eligiblePoolPlayers[Math.floor(Math.random() * eligiblePoolPlayers.length)],
+                                user.uid,
+                                state?.bidTimerSeconds
+                              )
+                            )
+                          }
+                        >
+                          Pick random player
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
+                  <List dense sx={{ maxHeight: 420, overflowY: "auto", flexGrow: 1 }}>
+                    {poolPlayers.map((player) => {
+                      const heldBack = !eligibleIds.has(player.id);
+                      return (
+                        <ListItem
+                          key={player.id}
+                          secondaryAction={
+                            !currentPlayer && (
+                              <Tooltip
+                                title={
+                                  heldBack
+                                    ? `Marquee player -- held back until ${heldBackPlayers.length * 2} or fewer players remain in the pool`
+                                    : "Put this player on the block"
+                                }
+                              >
+                                <span>
+                                  <Button
+                                    size="small"
+                                    disabled={busy || heldBack}
+                                    onClick={() => run(() => startPlayerOnBlock(eventId, player, user.uid, state?.bidTimerSeconds))}
+                                  >
+                                    Put on block
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                            )
+                          }
+                        >
+                          <ListItemAvatar>
+                            <Avatar src={player.photoUrl} alt={player.name} />
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={
+                              <Stack direction="row" alignItems="center" spacing={0.5}>
+                                {player.marquee && <StarIcon sx={{ fontSize: 15, color: "warning.main" }} />}
+                                <Typography variant="body2" component="span">
+                                  {player.name}
+                                </Typography>
+                              </Stack>
+                            }
+                            secondary={`Base price ${player.basePrice}${heldBack ? " · held back" : ""}`}
+                          />
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                </>
+              )}
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Paper variant="outlined" sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                Sold ({soldPlayers.length})
+              </Typography>
+              {soldPlayers.length === 0 ? (
+                <Typography color="text.secondary">No players sold yet.</Typography>
+              ) : (
+                <List dense sx={{ maxHeight: 420, overflowY: "auto", flexGrow: 1 }}>
+                  {soldPlayers.map((player) => (
+                    <ListItem key={player.id}>
+                      <ListItemAvatar>
+                        <Avatar src={player.photoUrl} alt={player.name} />
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={player.name}
+                        secondary={`${teams.find((t) => t.id === player.soldTeamId)?.name || "Unknown team"} · ${player.soldPrice}`}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Paper variant="outlined" sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                Unsold ({unsoldPlayers.length})
+              </Typography>
+              {unsoldPlayers.length === 0 ? (
+                <Typography color="text.secondary">No unsold players.</Typography>
+              ) : (
+                <List dense sx={{ maxHeight: 420, overflowY: "auto", flexGrow: 1 }}>
+                  {unsoldPlayers.map((player) => (
+                    <ListItem
+                      key={player.id}
+                      secondaryAction={
+                        <Button size="small" disabled={busy} onClick={() => handleRequeueUnsold(player)}>
+                          Back to pool
+                        </Button>
+                      }
+                    >
+                      <ListItemAvatar>
+                        <Avatar src={player.photoUrl} alt={player.name} />
+                      </ListItemAvatar>
+                      <ListItemText primary={player.name} secondary={`Base price ${player.basePrice}`} />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Paper>
+          </Grid>
+        </Grid>
       )}
 
       <Typography variant="subtitle1" fontWeight={600} gutterBottom>

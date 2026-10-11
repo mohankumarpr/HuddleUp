@@ -31,6 +31,8 @@ import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import UndoIcon from "@mui/icons-material/Undo";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
@@ -40,6 +42,7 @@ import {
   subscribeToPlayerPrivate,
   subscribeToPlayers,
   transferPlayer,
+  updatePlayer,
 } from "../../utils/firebase/players";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
@@ -98,6 +101,7 @@ export default function PlayerPool() {
   const [transferError, setTransferError] = useState(null);
   const [transferring, setTransferring] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [marqueeOnly, setMarqueeOnly] = useState(false);
   const statusFilter = searchParams.get("status") || "";
 
   function setStatusFilter(value) {
@@ -127,6 +131,7 @@ export default function PlayerPool() {
     const q = search.trim().toLowerCase();
     const filtered = players.filter((p) => {
       if (statusFilter && p.status !== statusFilter) return false;
+      if (marqueeOnly && !p.marquee) return false;
       if (!q) return true;
       const priv = privateById[p.id] || {};
       return [p.name, priv.email, priv.contact, priv.block].some((v) => (v || "").toLowerCase().includes(q));
@@ -136,7 +141,7 @@ export default function PlayerPool() {
     else if (sortBy === "basePrice") sorted.sort((a, b) => (b.basePrice || 0) - (a.basePrice || 0));
     else if (sortBy === "newest") sorted.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
     return sorted;
-  }, [players, privateById, search, statusFilter, sortBy]);
+  }, [players, privateById, search, statusFilter, marqueeOnly, sortBy]);
 
   const pageCount = Math.max(1, Math.ceil((visible?.length || 0) / PAGE_SIZE));
   const paged = useMemo(() => (visible || []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [visible, page]);
@@ -148,6 +153,19 @@ export default function PlayerPool() {
   function handleExport() {
     const csv = buildResultsCsv({ players, teams, sports, privateById });
     downloadTextFile("player-results.csv", csv);
+  }
+
+  async function handleToggleMarquee(player) {
+    try {
+      await updatePlayer(eventId, player.id, { marquee: !player.marquee });
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "player_marquee_changed",
+        summary: `${player.marquee ? "Unmarked" : "Marked"} ${player.name} as a marquee player`,
+      });
+    } catch (err) {
+      setDeleteError(friendlyErrorMessage(err));
+    }
   }
 
   async function handleDelete(player) {
@@ -284,6 +302,17 @@ export default function PlayerPool() {
             onClick={() => setStatusFilter(f.value)}
           />
         ))}
+        <Chip
+          icon={marqueeOnly ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+          label="Marquee only"
+          size="small"
+          color={marqueeOnly ? "warning" : "default"}
+          variant={marqueeOnly ? "filled" : "outlined"}
+          onClick={() => {
+            setMarqueeOnly((v) => !v);
+            setPage(1);
+          }}
+        />
         <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
           {visible.length} shown
         </Typography>
@@ -323,9 +352,12 @@ export default function PlayerPool() {
                     {player.name?.[0]}
                   </Avatar>
                   <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                    <Typography fontWeight={600} noWrap title={player.name}>
-                      {player.name}
-                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      {player.marquee && <StarIcon sx={{ fontSize: 16, color: "warning.main" }} />}
+                      <Typography fontWeight={600} noWrap title={player.name}>
+                        {player.name}
+                      </Typography>
+                    </Stack>
                     <Typography variant="caption" color="text.secondary">
                       {player.gender || "—"}
                     </Typography>
@@ -353,6 +385,13 @@ export default function PlayerPool() {
                 </Box>
 
                 <Stack direction="row" justifyContent="flex-end" spacing={0.5} sx={{ mt: 1.5, pt: 1, borderTop: 1, borderColor: "divider" }}>
+                  {player.status === "pool" && (
+                    <Tooltip title={player.marquee ? `Unmark ${player.name} as marquee` : `Mark ${player.name} as a marquee player`}>
+                      <IconButton size="small" onClick={() => handleToggleMarquee(player)} aria-label={`Toggle marquee for ${player.name}`}>
+                        {player.marquee ? <StarIcon fontSize="small" sx={{ color: "warning.main" }} /> : <StarBorderIcon fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
+                  )}
                   {hasHistory && (
                     <Tooltip title={`Bid history for ${player.name}`}>
                       <IconButton size="small" onClick={() => setHistoryPlayer(player)} aria-label={`Show bid history for ${player.name}`}>

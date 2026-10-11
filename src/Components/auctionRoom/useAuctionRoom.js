@@ -64,6 +64,8 @@ export function useAuctionRoom(eventId) {
   const currentPlayer = state?.currentPlayerId ? players.find((p) => p.id === state.currentPlayerId) : null;
   const highBidTeam = state?.currentHighBidTeamId ? teams.find((t) => t.id === state.currentHighBidTeamId) : null;
   const poolPlayers = players.filter((p) => p.status === "pool");
+  const soldPlayers = players.filter((p) => p.status === "sold");
+  const unsoldPlayers = players.filter((p) => p.status === "unsold");
   const stats = useMemo(() => computeAuctionStats(players), [players]);
 
   return {
@@ -74,6 +76,8 @@ export function useAuctionRoom(eventId) {
     currentPlayer,
     highBidTeam,
     poolPlayers,
+    soldPlayers,
+    unsoldPlayers,
     stats,
     soundEnabled,
     toggleSound,

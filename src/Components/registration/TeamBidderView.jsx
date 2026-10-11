@@ -44,6 +44,8 @@ export default function TeamBidderView() {
   const [bidding, setBidding] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
+  const [soldOpen, setSoldOpen] = useState(false);
+  const [unsoldOpen, setUnsoldOpen] = useState(false);
 
   useEffect(() => {
     (async () => setEvent(await getEventBySlug(eventSlug)))();
@@ -248,8 +250,69 @@ export default function TeamBidderView() {
         All teams' purses
       </Button>
       <Collapse in={teamsOpen}>
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
           <TeamPurseList teams={room.teams} highlightTeamId={teamRep.teamId} />
+        </Paper>
+      </Collapse>
+
+      <Button
+        size="small"
+        onClick={() => setSoldOpen((o) => !o)}
+        endIcon={soldOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        sx={{ mb: 1 }}
+      >
+        Sold players ({room.soldPlayers.length})
+      </Button>
+      <Collapse in={soldOpen}>
+        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+          {room.soldPlayers.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No players sold yet.
+            </Typography>
+          ) : (
+            <List dense disablePadding sx={{ maxHeight: 320, overflowY: "auto" }}>
+              {room.soldPlayers.map((p) => (
+                <ListItem key={p.id} disableGutters>
+                  <ListItemAvatar>
+                    <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={p.name}
+                    secondary={`${room.teams.find((t) => t.id === p.soldTeamId)?.name || "Unknown team"} · ${p.soldPrice}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Paper>
+      </Collapse>
+
+      <Button
+        size="small"
+        onClick={() => setUnsoldOpen((o) => !o)}
+        endIcon={unsoldOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        sx={{ mb: 1 }}
+      >
+        Unsold players ({room.unsoldPlayers.length})
+      </Button>
+      <Collapse in={unsoldOpen}>
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          {room.unsoldPlayers.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No unsold players.
+            </Typography>
+          ) : (
+            <List dense disablePadding sx={{ maxHeight: 320, overflowY: "auto" }}>
+              {room.unsoldPlayers.map((p) => (
+                <ListItem key={p.id} disableGutters>
+                  <ListItemAvatar>
+                    <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
+                  </ListItemAvatar>
+                  <ListItemText primary={p.name} secondary={`Base price ${p.basePrice}`} />
+                </ListItem>
+              ))}
+            </List>
+          )}
         </Paper>
       </Collapse>
     </Container>
