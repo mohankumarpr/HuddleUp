@@ -42,9 +42,8 @@ import {
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { logActivity } from "../../utils/firebase/activityLog";
 import { useAuctionRoom } from "./useAuctionRoom";
-import PlayerOnBlockCard from "./PlayerOnBlockCard";
+import PlayerOnBlockDialog from "./PlayerOnBlockDialog";
 import AuctionStatsBar from "./AuctionStatsBar";
-import BidHistoryList from "../common/BidHistoryList";
 import SoundToggleButton from "../common/SoundToggleButton";
 import TeamPurseList from "../common/TeamPurseList";
 import LoadingSpinner from "../LoadingSpinner";
@@ -235,6 +234,28 @@ export default function OrganizerConsole() {
     }
   }
 
+  function handleConfirmSold() {
+    const playerName = currentPlayer?.name;
+    const teamName = highBidTeam?.name;
+    const price = state?.currentPrice;
+    return run(async () => {
+      await confirmSold(eventId, user.uid);
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "player_sold",
+        summary: teamName ? `Sold ${playerName} to ${teamName} for ${price}` : `${playerName} went unsold (no bids)`,
+      });
+    });
+  }
+
+  function handleMarkUnsold() {
+    const playerName = currentPlayer?.name;
+    return run(async () => {
+      await markUnsold(eventId, user.uid);
+      logActivity(eventId, { actorUid: user.uid, action: "player_unsold", summary: `Marked ${playerName} unsold` });
+    });
+  }
+
   if (loading) return <LoadingSpinner />;
 
   const isLive = state?.status === "live";
@@ -315,121 +336,58 @@ export default function OrganizerConsole() {
         </Alert>
       )}
 
-      <Box sx={{ mb: 2 }}>
-        <PlayerOnBlockCard
-          player={currentPlayer}
-          currentPrice={state?.currentPrice}
-          highBidTeam={highBidTeam}
-          sportNames={sportNames}
-          basePrice={currentPlayer ? state?.basePrice : null}
-          deadlineAt={state?.blockDeadlineAt}
-          timerSeconds={state?.bidTimerSeconds}
-          onExtendTimer={() => run(() => extendBlockTimer(eventId, 60, user.uid))}
-        />
-      </Box>
-
-      {currentPlayer && (
-        <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-            Bid history
+      {!currentPlayer && isLive && (
+        <Paper variant="outlined" sx={{ p: 3, mb: 4 }}>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+            Pick the next player ({poolPlayers.length} remaining)
           </Typography>
-          <BidHistoryList bids={bids} teams={teams} dense />
-        </Paper>
-      )}
-
-      {currentPlayer ? (
-        <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-          <Button
-            variant="contained"
-            color="success"
-            size="large"
-            disabled={busy}
-            onClick={() => {
-              const playerName = currentPlayer?.name;
-              const teamName = highBidTeam?.name;
-              const price = state?.currentPrice;
-              run(async () => {
-                await confirmSold(eventId, user.uid);
-                logActivity(eventId, {
-                  actorUid: user.uid,
-                  action: "player_sold",
-                  summary: teamName ? `Sold ${playerName} to ${teamName} for ${price}` : `${playerName} went unsold (no bids)`,
-                });
-              });
-            }}
-          >
-            {highBidTeam ? `Confirm SOLD to ${highBidTeam.name}` : "Confirm (no bids -> unsold)"}
-          </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            size="large"
-            disabled={busy}
-            onClick={() => {
-              const playerName = currentPlayer?.name;
-              run(async () => {
-                await markUnsold(eventId, user.uid);
-                logActivity(eventId, { actorUid: user.uid, action: "player_unsold", summary: `Marked ${playerName} unsold` });
-              });
-            }}
-          >
-            Mark unsold
-          </Button>
-        </Stack>
-      ) : (
-        isLive && (
-          <Paper variant="outlined" sx={{ p: 3, mb: 4 }}>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-              Pick the next player ({poolPlayers.length} remaining)
+          {poolPlayers.length === 0 ? (
+            <Typography color="text.secondary">
+              No players left in the pool. Approve more registrations to continue.
             </Typography>
-            {poolPlayers.length === 0 ? (
-              <Typography color="text.secondary">
-                No players left in the pool. Approve more registrations to continue.
-              </Typography>
-            ) : (
-              <>
-                <Button
-                  variant="contained"
-                  sx={{ mb: 2 }}
-                  disabled={busy}
-                  onClick={() =>
-                    run(() =>
-                      startPlayerOnBlock(
-                        eventId,
-                        poolPlayers[Math.floor(Math.random() * poolPlayers.length)],
-                        user.uid,
-                        state?.bidTimerSeconds
-                      )
+          ) : (
+            <>
+              <Button
+                variant="contained"
+                sx={{ mb: 2 }}
+                disabled={busy}
+                onClick={() =>
+                  run(() =>
+                    startPlayerOnBlock(
+                      eventId,
+                      poolPlayers[Math.floor(Math.random() * poolPlayers.length)],
+                      user.uid,
+                      state?.bidTimerSeconds
                     )
-                  }
-                >
-                  Pick random player
-                </Button>
-                <List dense sx={{ maxHeight: 280, overflowY: "auto" }}>
-                  {poolPlayers.map((player) => (
-                    <ListItem
-                      key={player.id}
-                      secondaryAction={
-                        <Button
-                          size="small"
-                          disabled={busy}
-                          onClick={() => run(() => startPlayerOnBlock(eventId, player, user.uid, state?.bidTimerSeconds))}
-                        >
-                          Put on block
-                        </Button>
-                      }
-                    >
-                      <ListItemAvatar>
-                        <Avatar src={player.photoUrl} alt={player.name} />
-                      </ListItemAvatar>
-                      <ListItemText primary={player.name} secondary={`Base price ${player.basePrice}`} />
-                    </ListItem>
-                  ))}
-                </List>
-              </>
-            )}
-          </Paper>
-        )
+                  )
+                }
+              >
+                Pick random player
+              </Button>
+              <List dense sx={{ maxHeight: 280, overflowY: "auto" }}>
+                {poolPlayers.map((player) => (
+                  <ListItem
+                    key={player.id}
+                    secondaryAction={
+                      <Button
+                        size="small"
+                        disabled={busy}
+                        onClick={() => run(() => startPlayerOnBlock(eventId, player, user.uid, state?.bidTimerSeconds))}
+                      >
+                        Put on block
+                      </Button>
+                    }
+                  >
+                    <ListItemAvatar>
+                      <Avatar src={player.photoUrl} alt={player.name} />
+                    </ListItemAvatar>
+                    <ListItemText primary={player.name} secondary={`Base price ${player.basePrice}`} />
+                  </ListItem>
+                ))}
+              </List>
+            </>
+          )}
+        </Paper>
       )}
 
       <Typography variant="subtitle1" fontWeight={600} gutterBottom>
@@ -445,6 +403,22 @@ export default function OrganizerConsole() {
         bidTimerSeconds={state?.bidTimerSeconds}
         onClose={() => setRulesOpen(false)}
         onSave={(rules) => updateAuctionRules(eventId, rules, user.uid)}
+      />
+
+      <PlayerOnBlockDialog
+        player={currentPlayer}
+        currentPrice={state?.currentPrice}
+        highBidTeam={highBidTeam}
+        sportNames={sportNames}
+        basePrice={currentPlayer ? state?.basePrice : null}
+        deadlineAt={state?.blockDeadlineAt}
+        timerSeconds={state?.bidTimerSeconds}
+        onExtendTimer={() => run(() => extendBlockTimer(eventId, 60, user.uid))}
+        bids={bids}
+        teams={teams}
+        busy={busy}
+        onConfirmSold={handleConfirmSold}
+        onMarkUnsold={handleMarkUnsold}
       />
     </Box>
   );

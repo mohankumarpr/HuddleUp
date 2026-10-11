@@ -88,8 +88,10 @@ test("organizer runs an auction, a team rep bids, the sale is confirmed, and the
   await expect(confirmButton).toBeVisible({ timeout: 15000 });
   await confirmButton.click();
 
-  // The block clears (confirmSold resets currentPlayerId) and the auction waits for the next pick.
-  await expect(page.getByText("Waiting for the next player", { exact: false })).toBeVisible({ timeout: 15000 });
+  // The block clears (confirmSold resets currentPlayerId): the player-on-block dialog closes, and
+  // since this test's only pool player was just sold, the picker reports an empty pool.
+  await expect(page.getByRole("heading", { name: playerName })).toBeHidden({ timeout: 15000 });
+  await expect(page.getByText("No players left in the pool", { exact: false })).toBeVisible({ timeout: 15000 });
 
   // The player pool shows the player as sold to team A for the bid price.
   await page.goto(`/app/events/${eventId}/players`);

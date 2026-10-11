@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Chip, List, ListItem, ListItemText, Typography } from "@mui/material";
+import { Box, Chip, List, ListItem, ListItemText, Stack, Typography } from "@mui/material";
 
 function timeAgo(placedAt) {
   const ms = placedAt?.toMillis ? placedAt.toMillis() : null;
@@ -16,7 +16,9 @@ function timeAgo(placedAt) {
 // current player's bid feed in the auction room -- and historically, from the player pool, to
 // settle "wait, who bid first" questions after the fact. `dark` is for hosts like SpectatorView
 // that are always rendered on a dark background regardless of the site's light/dark mode.
-export default function BidHistoryList({ bids, teams, dense = false, emptyText = "No bids yet.", dark = false }) {
+// `highlightTop` calls out bids[0] as the current leading bid -- only meaningful while a player is
+// actively on the block (newest bid == highest bid); not used for a settled player's history.
+export default function BidHistoryList({ bids, teams, dense = false, emptyText = "No bids yet.", dark = false, highlightTop = false }) {
   const textSx = dark ? { color: "#fff" } : undefined;
   const secondarySx = dark ? { color: "grey.400" } : undefined;
 
@@ -30,18 +32,48 @@ export default function BidHistoryList({ bids, teams, dense = false, emptyText =
 
   return (
     <List dense={dense} disablePadding>
-      {bids.map((bid) => {
+      {bids.map((bid, i) => {
         const team = teams.find((t) => t.id === bid.teamId);
+        const isTop = highlightTop && i === 0;
         return (
-          <ListItem key={bid.id} disableGutters divider={!dark} sx={dark ? { borderBottom: "1px solid rgba(255,255,255,0.1)" } : undefined}>
+          <ListItem
+            key={bid.id}
+            disableGutters
+            divider={!dark}
+            sx={{
+              ...(dark ? { borderBottom: "1px solid rgba(255,255,255,0.1)" } : {}),
+              ...(isTop && {
+                borderRadius: 1.5,
+                bgcolor: dark ? "rgba(16,185,129,0.18)" : "rgba(16,185,129,0.12)",
+                pl: 1,
+                my: 0.5,
+              }),
+            }}
+          >
             <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: team?.color || "grey.400", mr: 1.5, flexShrink: 0 }} />
             <ListItemText
-              primary={team?.name || "Unknown team"}
+              primary={
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography component="span" sx={{ fontWeight: isTop ? 700 : 400, ...textSx }}>
+                    {team?.name || "Unknown team"}
+                  </Typography>
+                  {isTop && <Chip size="small" label="Leading" color="success" sx={{ height: 18, fontSize: 11 }} />}
+                </Stack>
+              }
               secondary={timeAgo(bid.placedAt)}
-              primaryTypographyProps={{ sx: textSx }}
               secondaryTypographyProps={{ sx: secondarySx }}
             />
-            <Chip size="small" label={bid.amount} sx={dark ? { bgcolor: "rgba(255,255,255,0.12)", color: "#fff" } : undefined} />
+            <Chip
+              size="small"
+              label={bid.amount}
+              sx={
+                isTop
+                  ? { bgcolor: "success.main", color: "#fff", fontWeight: 700 }
+                  : dark
+                    ? { bgcolor: "rgba(255,255,255,0.12)", color: "#fff" }
+                    : undefined
+              }
+            />
           </ListItem>
         );
       })}
