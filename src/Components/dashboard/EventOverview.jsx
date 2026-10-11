@@ -12,6 +12,8 @@ import {
   Grid,
   IconButton,
   LinearProgress,
+  MenuItem,
+  Select,
   Stack,
   Tooltip,
   Typography,
@@ -32,11 +34,14 @@ import SportsTennisIcon from "@mui/icons-material/SportsTennis";
 import DownloadIcon from "@mui/icons-material/Download";
 import HistoryIcon from "@mui/icons-material/History";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
 import { getTeamOwners, subscribeToEvent, subscribeToSports, subscribeToTeams, updateEvent } from "../../utils/firebase/events";
 import { subscribeToPlayers } from "../../utils/firebase/players";
 import { subscribeToPendingRegistrationCount } from "../../utils/firebase/registrations";
 import { subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
 import { downloadEventBackup } from "../../utils/firebase/backup";
+import { logActivity } from "../../utils/firebase/activityLog";
 import { formatDate, formatDateTime, participantsLabel, sortSportsBySchedule } from "../../utils/format";
 import QrCodeButton from "../common/QrCodeButton";
 import StandingsTable from "../common/StandingsTable";
@@ -173,6 +178,8 @@ function CopyRow({ label, value }) {
 
 export default function EventOverview() {
   const { eventId } = useParams();
+  const { user } = useAuth();
+  const confirm = useConfirm();
   const [event, setEvent] = useState(null);
   const [teams, setTeams] = useState(null);
   const [sports, setSports] = useState(null);
@@ -215,14 +222,27 @@ export default function EventOverview() {
     watch: `${origin}/e/${event.slug}/watch`,
     join: `${origin}/e/${event.slug}/join`,
   };
-  const nextStatus = STATUS_FLOW[Math.min(STATUS_FLOW.indexOf(event.status) + 1, STATUS_FLOW.length - 1)];
-  const isLast = event.status === "ended";
   const count = (status) => players.filter((p) => p.status === status).length;
 
-  async function advanceStatus() {
+  async function changeStatus(newStatus) {
+    if (newStatus === event.status) return;
+    const ok = await confirm({
+      title: `Change status to "${STATUS_LABEL[newStatus]}"?`,
+      description:
+        newStatus === "ended"
+          ? "This marks the event as finished. You can always change it back later if needed."
+          : `The event will show as "${STATUS_LABEL[newStatus]}" everywhere it's displayed.`,
+      confirmLabel: "Change status",
+    });
+    if (!ok) return;
     setError(null);
     try {
-      await updateEvent(event.id, { status: nextStatus });
+      await updateEvent(event.id, { status: newStatus });
+      logActivity(event.id, {
+        actorUid: user.uid,
+        action: "event_status_changed",
+        summary: `Changed event status from ${STATUS_LABEL[event.status]} to ${STATUS_LABEL[newStatus]}`,
+      });
     } catch (err) {
       setError(err.message || "Couldn't update the event status.");
     }
@@ -251,20 +271,26 @@ export default function EventOverview() {
         icon={<SportsScoreIcon />}
         action={
           <Stack direction={{ xs: "row", sm: "column" }} alignItems={{ xs: "center", sm: "flex-end" }} spacing={1}>
-            <Chip label={STATUS_LABEL[event.status]} sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "#fff", fontWeight: 700 }} />
-            <Button
+            <Select
               size="small"
-              variant={isLast ? "outlined" : "contained"}
-              onClick={advanceStatus}
-              disabled={isLast}
-              sx={
-                isLast
-                  ? { color: "#fff", borderColor: "rgba(255,255,255,0.4)" }
-                  : { bgcolor: "#fff", color: "primary.dark", "&:hover": { bgcolor: "rgba(255,255,255,0.9)" } }
-              }
+              value={event.status}
+              onChange={(e) => changeStatus(e.target.value)}
+              aria-label="Event status"
+              sx={{
+                bgcolor: "rgba(255,255,255,0.15)",
+                color: "#fff",
+                fontWeight: 700,
+                ".MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.4)" },
+                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.7)" },
+                ".MuiSvgIcon-root": { color: "#fff" },
+              }}
             >
-              {isLast ? "Event ended" : `Mark as "${STATUS_LABEL[nextStatus]}"`}
-            </Button>
+              {STATUS_FLOW.map((s) => (
+                <MenuItem key={s} value={s}>
+                  {STATUS_LABEL[s]}
+                </MenuItem>
+              ))}
+            </Select>
             <Button
               size="small"
               variant="outlined"

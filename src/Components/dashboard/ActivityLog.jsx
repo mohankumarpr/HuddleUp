@@ -12,6 +12,7 @@ const ACTION_LABELS = {
   player_removed: "Player removed",
   player_transferred: "Player transferred",
   player_returned_to_pool: "Player returned to pool",
+  event_status_changed: "Event status changed",
   registration_approved: "Registration approved",
   registration_rejected: "Registration rejected",
   player_sold: "Player sold",
