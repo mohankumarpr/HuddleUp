@@ -8,6 +8,7 @@ import {
   Chip,
   CircularProgress,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Grid,
@@ -28,10 +29,18 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import HistoryIcon from "@mui/icons-material/History";
 import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import UndoIcon from "@mui/icons-material/Undo";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
-import { deletePlayer, subscribeToPlayerPrivate, subscribeToPlayers } from "../../utils/firebase/players";
+import {
+  deletePlayer,
+  returnPlayerToPool,
+  subscribeToPlayerPrivate,
+  subscribeToPlayers,
+  transferPlayer,
+} from "../../utils/firebase/players";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { logActivity } from "../../utils/firebase/activityLog";
@@ -84,6 +93,10 @@ export default function PlayerPool() {
   const [sortBy, setSortBy] = useState("name");
   const [page, setPage] = useState(1);
   const [historyPlayer, setHistoryPlayer] = useState(null);
+  const [transferTarget, setTransferTarget] = useState(null);
+  const [transferToTeamId, setTransferToTeamId] = useState("");
+  const [transferError, setTransferError] = useState(null);
+  const [transferring, setTransferring] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const statusFilter = searchParams.get("status") || "";
 
@@ -149,6 +162,53 @@ export default function PlayerPool() {
     try {
       await deletePlayer(eventId, player.id);
       logActivity(eventId, { actorUid: user.uid, action: "player_removed", summary: `Removed ${player.name} from the player pool` });
+    } catch (err) {
+      setDeleteError(friendlyErrorMessage(err));
+    }
+  }
+
+  function openTransfer(player) {
+    setTransferError(null);
+    setTransferToTeamId("");
+    setTransferTarget(player);
+  }
+
+  async function handleTransferConfirm() {
+    if (!transferToTeamId) return;
+    setTransferring(true);
+    setTransferError(null);
+    try {
+      const toTeam = teams.find((t) => t.id === transferToTeamId);
+      await transferPlayer(eventId, transferTarget.id, transferToTeamId);
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "player_transferred",
+        summary: `Transferred ${transferTarget.name} to ${toTeam?.name || "another team"} for ${transferTarget.soldPrice}`,
+      });
+      setTransferTarget(null);
+    } catch (err) {
+      setTransferError(friendlyErrorMessage(err));
+    } finally {
+      setTransferring(false);
+    }
+  }
+
+  async function handleReturnToPool(player) {
+    const ok = await confirm({
+      title: `Return ${player.name} to the pool?`,
+      description: `${teamName(player.soldTeamId) || "Their team"} will be refunded ${player.soldPrice}, and ${player.name} becomes available to put on the block again.`,
+      confirmLabel: "Return to pool",
+      destructive: true,
+    });
+    if (!ok) return;
+    setDeleteError(null);
+    try {
+      await returnPlayerToPool(eventId, player.id);
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "player_returned_to_pool",
+        summary: `Returned ${player.name} to the pool (refunded ${player.soldPrice} to ${teamName(player.soldTeamId) || "their team"})`,
+      });
     } catch (err) {
       setDeleteError(friendlyErrorMessage(err));
     }
@@ -300,6 +360,20 @@ export default function PlayerPool() {
                       </IconButton>
                     </Tooltip>
                   )}
+                  {player.status === "sold" && (
+                    <>
+                      <Tooltip title={`Transfer ${player.name} to another team`}>
+                        <IconButton size="small" onClick={() => openTransfer(player)} aria-label={`Transfer ${player.name}`}>
+                          <SwapHorizIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={`Return ${player.name} to the pool (refunds their team)`}>
+                        <IconButton size="small" onClick={() => handleReturnToPool(player)} aria-label={`Return ${player.name} to pool`}>
+                          <UndoIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  )}
                   <Tooltip title={removable ? `Remove ${player.name}` : "Sold or on-the-block players can't be removed"}>
                     <span>
                       <IconButton
@@ -335,6 +409,42 @@ export default function PlayerPool() {
         <DialogContent>
           {historyPlayer && <PlayerBidHistory eventId={eventId} playerId={historyPlayer.id} teams={teams} />}
         </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(transferTarget)} onClose={() => setTransferTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Transfer {transferTarget?.name}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Moves {transferTarget?.name} from {teamName(transferTarget?.soldTeamId) || "their current team"} to the team
+            below at the same price ({transferTarget?.soldPrice}) -- the current team is refunded, the new team is charged.
+          </Typography>
+          {transferError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {transferError}
+            </Alert>
+          )}
+          <TextField
+            select
+            label="Transfer to"
+            value={transferToTeamId}
+            onChange={(e) => setTransferToTeamId(e.target.value)}
+            fullWidth
+          >
+            {teams
+              .filter((t) => t.id !== transferTarget?.soldTeamId)
+              .map((t) => (
+                <MenuItem key={t.id} value={t.id}>
+                  {t.name} (purse {t.purseRemaining})
+                </MenuItem>
+              ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTransferTarget(null)}>Cancel</Button>
+          <Button variant="contained" disabled={!transferToTeamId || transferring} onClick={handleTransferConfirm}>
+            {transferring ? "Transferring..." : "Transfer"}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

@@ -10,6 +10,8 @@ const ACTION_LABELS = {
   team_deleted: "Team deleted",
   sport_deleted: "Sport deleted",
   player_removed: "Player removed",
+  player_transferred: "Player transferred",
+  player_returned_to_pool: "Player returned to pool",
   registration_approved: "Registration approved",
   registration_rejected: "Registration rejected",
   player_sold: "Player sold",

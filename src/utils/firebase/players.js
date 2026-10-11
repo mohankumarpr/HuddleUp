@@ -5,6 +5,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -108,4 +109,61 @@ export async function deletePlayer(eventId, playerId) {
   batch.delete(ref);
   batch.delete(doc(db, "events", eventId, "playerPrivate", playerId));
   await batch.commit();
+}
+
+// Post-auction roster correction -- moves a sold player to a different team at the same price the
+// original team paid. The selling team is refunded that amount, the receiving team is charged it.
+// A transaction because the receiving team's purse must be re-checked against its live value at
+// commit time, same reasoning as a live bid.
+export async function transferPlayer(eventId, playerId, toTeamId) {
+  const playerRef = doc(db, "events", eventId, "players", playerId);
+  const toTeamRef = doc(db, "events", eventId, "teams", toTeamId);
+
+  return runTransaction(db, async (tx) => {
+    const playerSnap = await tx.get(playerRef);
+    if (!playerSnap.exists() || playerSnap.data().status !== "sold") {
+      throw new AppError("PLAYER_NOT_SOLD");
+    }
+    const player = playerSnap.data();
+    if (player.soldTeamId === toTeamId) {
+      throw new AppError("SAME_TEAM");
+    }
+
+    const fromTeamRef = doc(db, "events", eventId, "teams", player.soldTeamId);
+    const [fromTeamSnap, toTeamSnap] = await Promise.all([tx.get(fromTeamRef), tx.get(toTeamRef)]);
+    if (!fromTeamSnap.exists() || !toTeamSnap.exists()) {
+      throw new AppError("TEAM_NOT_FOUND");
+    }
+
+    const price = player.soldPrice || 0;
+    const toTeam = toTeamSnap.data();
+    if (price > toTeam.purseRemaining) {
+      throw new AppError("TRANSFER_INSUFFICIENT_PURSE");
+    }
+
+    tx.update(fromTeamRef, { purseRemaining: fromTeamSnap.data().purseRemaining + price });
+    tx.update(toTeamRef, { purseRemaining: toTeam.purseRemaining - price });
+    tx.update(playerRef, { soldTeamId: toTeamId });
+  });
+}
+
+// Reverts a sold player back to the pool and refunds their price to the team that bought them --
+// unlike the live auction console's single-level undo, this works on any sold player at any time,
+// not just the most recent sale.
+export async function returnPlayerToPool(eventId, playerId) {
+  const playerRef = doc(db, "events", eventId, "players", playerId);
+
+  return runTransaction(db, async (tx) => {
+    const playerSnap = await tx.get(playerRef);
+    if (!playerSnap.exists() || playerSnap.data().status !== "sold") {
+      throw new AppError("PLAYER_NOT_SOLD");
+    }
+    const player = playerSnap.data();
+    const teamRef = doc(db, "events", eventId, "teams", player.soldTeamId);
+    const teamSnap = await tx.get(teamRef);
+    if (teamSnap.exists()) {
+      tx.update(teamRef, { purseRemaining: teamSnap.data().purseRemaining + (player.soldPrice || 0) });
+    }
+    tx.update(playerRef, { status: "pool", soldTeamId: null, soldPrice: null, soldAt: null });
+  });
 }

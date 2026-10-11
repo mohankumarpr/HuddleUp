@@ -28,6 +28,10 @@ const FRIENDLY_MESSAGES = {
   ALREADY_IN_ANOTHER_ORG: "This account already belongs to a different organization. Accept this invite with a different email instead.",
   TEAM_HAS_SOLD_PLAYERS: "This team has already bought players in the auction and can't be deleted. Unsell those players first if you need to remove the team.",
   PLAYER_NOT_REMOVABLE: "This player is sold or currently on the auction block and can't be removed. Undo the sale from the auction console first if needed.",
+  PLAYER_NOT_SOLD: "This player isn't currently sold to a team.",
+  SAME_TEAM: "This player is already on that team.",
+  TEAM_NOT_FOUND: "Couldn't find one of the teams involved.",
+  TRANSFER_INSUFFICIENT_PURSE: "That team's remaining purse can't cover this player's price.",
 };
 
 export function friendlyErrorMessage(err) {
