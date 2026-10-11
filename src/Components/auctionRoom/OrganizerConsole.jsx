@@ -37,6 +37,8 @@ import {
   extendBlockTimer,
   getOrCreateAuctionState,
   markUnsold,
+  nextIncrement,
+  placeBid,
   revertLastAction,
   setAuctionStatus,
   startPlayerOnBlock,
@@ -262,6 +264,25 @@ export default function OrganizerConsole() {
     });
   }
 
+  // The organizer placing a bid "for" a team -- useful when a rep is bidding verbally/in person
+  // and the organizer is entering it on their behalf, or a team has no rep logged in at all.
+  // Reuses the same transactional placeBid the public bidder view uses, so the purse check and
+  // concurrency safety are identical; Firestore rules already let an org member write this
+  // regardless of whose uid places it.
+  function handleBidForTeam(teamId) {
+    const team = teams.find((t) => t.id === teamId);
+    const playerName = currentPlayer?.name;
+    const price = state ? nextIncrement(state.currentPrice, state.incrementLadder) : null;
+    return run(async () => {
+      await placeBid(eventId, teamId, user.uid);
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "organizer_bid_placed",
+        summary: `Placed a bid of ${price} for ${team?.name || "a team"} on ${playerName || "the player"}`,
+      });
+    });
+  }
+
   if (loading) return <LoadingSpinner />;
 
   const isLive = state?.status === "live";
@@ -270,6 +291,7 @@ export default function OrganizerConsole() {
   const undoTeamName = undo?.type === "sold" && teams.find((t) => t.id === undo.teamId)?.name;
   const { eligible: eligiblePoolPlayers, heldBack: heldBackPlayers } = partitionPoolForAuction(poolPlayers);
   const eligibleIds = new Set(eligiblePoolPlayers.map((p) => p.id));
+  const nextBidAmount = state ? nextIncrement(state.currentPrice, state.incrementLadder) : null;
 
   function handleRequeueUnsold(player) {
     return run(async () => {
@@ -528,6 +550,10 @@ export default function OrganizerConsole() {
         bids={bids}
         teams={teams}
         busy={busy}
+        error={error}
+        onDismissError={() => setError(null)}
+        nextBidAmount={nextBidAmount}
+        onBidForTeam={handleBidForTeam}
         onConfirmSold={handleConfirmSold}
         onMarkUnsold={handleMarkUnsold}
       />

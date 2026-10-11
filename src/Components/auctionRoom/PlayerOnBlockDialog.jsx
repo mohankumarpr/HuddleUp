@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Avatar, Box, Button, Chip, Dialog, Stack, Typography } from "@mui/material";
+import { Alert, Avatar, Box, Button, Chip, Dialog, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import AddAlarmIcon from "@mui/icons-material/AddAlarm";
+import GavelIcon from "@mui/icons-material/Gavel";
 import BidTimer from "./BidTimer";
 import BidHistoryList from "../common/BidHistoryList";
 
@@ -22,10 +23,25 @@ export default function PlayerOnBlockDialog({
   bids,
   teams,
   busy,
+  error,
+  onDismissError,
+  nextBidAmount,
+  onBidForTeam,
   onConfirmSold,
   onMarkUnsold,
 }) {
   const accent = highBidTeam?.color || "#6366F1";
+  const [proxyTeamId, setProxyTeamId] = useState("");
+
+  // Reset the picker whenever a new player comes on the block, or once the team it was set to
+  // takes the lead (no point re-offering the team that's already winning).
+  useEffect(() => {
+    setProxyTeamId("");
+  }, [player?.id]);
+
+  const proxyCandidates = teams.filter((t) => t.id !== highBidTeam?.id);
+  const proxyTeam = teams.find((t) => t.id === proxyTeamId);
+  const proxyCanAfford = !proxyTeam || nextBidAmount == null || proxyTeam.purseRemaining >= nextBidAmount;
 
   return (
     <Dialog
@@ -111,6 +127,12 @@ export default function PlayerOnBlockDialog({
                 minHeight: 0,
               }}
             >
+              {error && (
+                <Alert severity="error" onClose={onDismissError} sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              )}
+
               <Stack direction="row" alignItems="center" justifyContent="center" spacing={4} sx={{ mb: 4, flexWrap: "wrap" }}>
                 {deadlineAt && (
                   <Stack alignItems="center" spacing={0.5}>
@@ -142,6 +164,51 @@ export default function PlayerOnBlockDialog({
                   )}
                 </Box>
               </Stack>
+
+              {onBidForTeam && (
+                <Box sx={{ mb: 3, p: 2, borderRadius: 2, bgcolor: "rgba(255,255,255,0.05)" }}>
+                  <Typography variant="caption" sx={{ color: "grey.400", display: "block", mb: 1 }}>
+                    Bid on behalf of a team (e.g. a rep bidding in person, or no rep online)
+                  </Typography>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                    <TextField
+                      select
+                      size="small"
+                      label="Team"
+                      value={proxyTeamId}
+                      onChange={(e) => setProxyTeamId(e.target.value)}
+                      sx={{
+                        flexGrow: 1,
+                        "& .MuiInputBase-root": { color: "#fff" },
+                        "& .MuiInputLabel-root": { color: "grey.400" },
+                        "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.3)" },
+                      }}
+                    >
+                      {proxyCandidates.map((t) => (
+                        <MenuItem key={t.id} value={t.id}>
+                          {t.name} (purse {t.purseRemaining})
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    <Button
+                      variant="contained"
+                      startIcon={<GavelIcon />}
+                      disabled={busy || !proxyTeamId || !proxyCanAfford}
+                      onClick={() => {
+                        onBidForTeam(proxyTeamId);
+                        setProxyTeamId("");
+                      }}
+                    >
+                      Bid {nextBidAmount}
+                    </Button>
+                  </Stack>
+                  {proxyTeamId && !proxyCanAfford && (
+                    <Typography variant="caption" color="error.light" sx={{ display: "block", mt: 0.5 }}>
+                      {proxyTeam?.name}'s remaining purse can't cover this bid.
+                    </Typography>
+                  )}
+                </Box>
+              )}
 
               <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, color: "grey.400" }}>
                 Bid history
