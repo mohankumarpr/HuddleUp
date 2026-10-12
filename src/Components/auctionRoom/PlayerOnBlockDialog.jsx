@@ -32,13 +32,11 @@ export default function PlayerOnBlockDialog({
 }) {
   const accent = highBidTeam?.color || "#6366F1";
   const [proxyTeamId, setProxyTeamId] = useState("");
-  const [bioExpanded, setBioExpanded] = useState(false);
 
-  // Reset the picker and bio expansion whenever a new player comes on the block, or once the team
-  // it was set to takes the lead (no point re-offering the team that's already winning).
+  // Reset the picker whenever a new player comes on the block, or once the team it was set to
+  // takes the lead (no point re-offering the team that's already winning).
   useEffect(() => {
     setProxyTeamId("");
-    setBioExpanded(false);
   }, [player?.id]);
 
   const proxyCandidates = teams.filter((t) => t.id !== highBidTeam?.id);
@@ -127,33 +125,27 @@ export default function PlayerOnBlockDialog({
                 )}
               </Stack>
               {player.aboutMe && (
-                <Box sx={{ mt: 2.5, maxWidth: 420, width: "100%" }}>
+                <Box
+                  sx={{
+                    mt: 2.5,
+                    maxWidth: 420,
+                    width: "100%",
+                    maxHeight: 180,
+                    overflowY: "auto",
+                    pr: 1,
+                  }}
+                >
                   <Typography
                     sx={{
                       textAlign: "left",
                       color: "grey.300",
                       fontSize: 14,
-                      lineHeight: 1.6,
+                      lineHeight: 1.7,
                       whiteSpace: "pre-line",
-                      ...(bioExpanded
-                        ? {}
-                        : {
-                            display: "-webkit-box",
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }),
                     }}
                   >
                     {player.aboutMe}
                   </Typography>
-                  <Button
-                    size="small"
-                    onClick={() => setBioExpanded((v) => !v)}
-                    sx={{ mt: 0.5, color: "primary.light", textTransform: "none", px: 0, minWidth: 0 }}
-                  >
-                    {bioExpanded ? "Show less" : "Show more"}
-                  </Button>
                 </Box>
               )}
             </Box>
