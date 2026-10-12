@@ -116,8 +116,18 @@ export default function RegistrationReviewQueue() {
                   {sportNames(registration.sportIds) || "No sports selected"}
                 </Typography>
                 {registration.aboutMe && (
-                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
-                    “{registration.aboutMe}”
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      whiteSpace: "pre-line",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {registration.aboutMe}
                   </Typography>
                 )}
               </Box>

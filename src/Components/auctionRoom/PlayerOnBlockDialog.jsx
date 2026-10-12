@@ -32,11 +32,13 @@ export default function PlayerOnBlockDialog({
 }) {
   const accent = highBidTeam?.color || "#6366F1";
   const [proxyTeamId, setProxyTeamId] = useState("");
+  const [bioExpanded, setBioExpanded] = useState(false);
 
-  // Reset the picker whenever a new player comes on the block, or once the team it was set to
-  // takes the lead (no point re-offering the team that's already winning).
+  // Reset the picker and bio expansion whenever a new player comes on the block, or once the team
+  // it was set to takes the lead (no point re-offering the team that's already winning).
   useEffect(() => {
     setProxyTeamId("");
+    setBioExpanded(false);
   }, [player?.id]);
 
   const proxyCandidates = teams.filter((t) => t.id !== highBidTeam?.id);
@@ -58,15 +60,28 @@ export default function PlayerOnBlockDialog({
     >
       {player && (
         <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column", color: "#fff" }}>
-          <Box sx={{ flexGrow: 1, overflowY: "auto", display: "flex", flexDirection: { xs: "column", md: "row" } }}>
-            {/* Photo panel */}
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+            }}
+          >
+            {/* Photo panel -- flex-start (not center), since centered content that overflows clips
+                at the start and can't be scrolled back into view (a classic flexbox gotcha). On
+                mobile the photo and price panels stack and scroll together via the parent above;
+                on desktop they sit side by side, each tall enough to need its own scroll. */}
             <Box
               sx={{
                 flex: { xs: "0 0 auto", md: "0 0 42%" },
+                minHeight: 0,
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                justifyContent: "center",
+                justifyContent: "flex-start",
+                overflowY: { xs: "visible", md: "auto" },
                 py: { xs: 5, md: 8 },
                 px: 3,
               }}
@@ -112,18 +127,34 @@ export default function PlayerOnBlockDialog({
                 )}
               </Stack>
               {player.aboutMe && (
-                <Typography
-                  sx={{
-                    mt: 2.5,
-                    maxWidth: 360,
-                    textAlign: "center",
-                    fontStyle: "italic",
-                    color: "grey.300",
-                    fontSize: 15,
-                  }}
-                >
-                  "{player.aboutMe}"
-                </Typography>
+                <Box sx={{ mt: 2.5, maxWidth: 420, width: "100%" }}>
+                  <Typography
+                    sx={{
+                      textAlign: "left",
+                      color: "grey.300",
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      whiteSpace: "pre-line",
+                      ...(bioExpanded
+                        ? {}
+                        : {
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }),
+                    }}
+                  >
+                    {player.aboutMe}
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => setBioExpanded((v) => !v)}
+                    sx={{ mt: 0.5, color: "primary.light", textTransform: "none", px: 0, minWidth: 0 }}
+                  >
+                    {bioExpanded ? "Show less" : "Show more"}
+                  </Button>
+                </Box>
               )}
             </Box>
 

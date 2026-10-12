@@ -396,20 +396,20 @@ export default function PlayerPool() {
                     </Typography>
                   )}
                   {player.aboutMe && (
-                    <Tooltip title={player.aboutMe}>
+                    <Tooltip title={player.aboutMe} componentsProps={{ tooltip: { sx: { whiteSpace: "pre-line", maxWidth: 320 } } }}>
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         sx={{
                           mt: 1,
-                          fontStyle: "italic",
+                          whiteSpace: "pre-line",
                           display: "-webkit-box",
                           WebkitLineClamp: 3,
                           WebkitBoxOrient: "vertical",
                           overflow: "hidden",
                         }}
                       >
-                        "{player.aboutMe}"
+                        {player.aboutMe}
                       </Typography>
                     </Tooltip>
                   )}

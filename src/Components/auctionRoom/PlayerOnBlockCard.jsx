@@ -59,8 +59,19 @@ export default function PlayerOnBlockCard({
                 {basePrice != null && ` · Base ${basePrice}`}
               </Typography>
               {player.aboutMe && (
-                <Typography variant="body2" sx={{ color: "grey.300", fontStyle: "italic", mt: 1 }}>
-                  "{player.aboutMe}"
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "grey.300",
+                    mt: 1,
+                    whiteSpace: "pre-line",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {player.aboutMe}
                 </Typography>
               )}
             </Box>
