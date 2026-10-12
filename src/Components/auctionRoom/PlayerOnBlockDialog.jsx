@@ -1,7 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Alert, Avatar, Box, Button, Chip, Dialog, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import AddAlarmIcon from "@mui/icons-material/AddAlarm";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import GavelIcon from "@mui/icons-material/Gavel";
 import BidTimer from "./BidTimer";
 import BidHistoryList from "../common/BidHistoryList";
@@ -32,11 +47,12 @@ export default function PlayerOnBlockDialog({
 }) {
   const accent = highBidTeam?.color || "#6366F1";
   const [proxyTeamId, setProxyTeamId] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
-  // Reset the picker whenever a new player comes on the block, or once the team it was set to
-  // takes the lead (no point re-offering the team that's already winning).
+  // Reset the picker and collapse history back down whenever a new player comes on the block.
   useEffect(() => {
     setProxyTeamId("");
+    setHistoryOpen(false);
   }, [player?.id]);
 
   const proxyCandidates = teams.filter((t) => t.id !== highBidTeam?.id);
@@ -58,6 +74,9 @@ export default function PlayerOnBlockDialog({
     >
       {player && (
         <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column", color: "#fff" }}>
+          {/* The whole middle area scrolls as one unit -- simpler and more robust than giving each
+              column its own independent scroll, which could silently squash a tall child (like the
+              description panel) instead of letting it scroll into view. */}
           <Box
             sx={{
               flex: 1,
@@ -67,20 +86,17 @@ export default function PlayerOnBlockDialog({
               flexDirection: { xs: "column", md: "row" },
             }}
           >
-            {/* Photo panel -- flex-start (not center), since centered content that overflows clips
-                at the start and can't be scrolled back into view (a classic flexbox gotcha). On
-                mobile the photo and price panels stack and scroll together via the parent above;
-                on desktop they sit side by side, each tall enough to need its own scroll. */}
+            {/* Photo panel -- just the photo, name, and light metadata. Everything else (price,
+                leading team, description, bid history) lives in the panel beside it, grouped
+                together since those are what the organizer needs to see at a glance. */}
             <Box
               sx={{
-                flex: { xs: "0 0 auto", md: "0 0 42%" },
-                minHeight: 0,
+                flex: { xs: "0 0 auto", md: "0 0 38%" },
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "flex-start",
-                overflowY: { xs: "visible", md: "auto" },
-                py: { xs: 5, md: 8 },
+                py: { xs: 4, md: 6 },
                 px: 3,
               }}
             >
@@ -95,8 +111,8 @@ export default function PlayerOnBlockDialog({
               >
                 <Box
                   sx={{
-                    width: { xs: 190, sm: 240, md: 300 },
-                    height: { xs: 190, sm: 240, md: 300 },
+                    width: { xs: 170, sm: 210, md: 260 },
+                    height: { xs: 170, sm: 210, md: 260 },
                     borderRadius: "50%",
                     p: "6px",
                     background: `conic-gradient(${accent}, rgba(255,255,255,0.15), ${accent})`,
@@ -106,51 +122,38 @@ export default function PlayerOnBlockDialog({
                   <Avatar
                     src={player.photoUrl}
                     alt={player.name}
-                    sx={{ width: "100%", height: "100%", fontSize: 72, border: "5px solid #0B1220" }}
+                    sx={{ width: "100%", height: "100%", fontSize: 64, border: "5px solid #0B1220" }}
                   >
                     {player.name?.[0]}
                   </Avatar>
                 </Box>
               </motion.div>
-              <Typography variant="h3" fontWeight={800} sx={{ mt: 3, textAlign: "center", fontSize: { xs: 28, sm: 34, md: 40 } }}>
+              <Typography variant="h3" fontWeight={800} sx={{ mt: 3, textAlign: "center", fontSize: { xs: 26, sm: 30, md: 34 } }}>
                 {player.name}
               </Typography>
-              <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap" justifyContent="center" useFlexGap>
+              <Stack direction="row" spacing={0.75} sx={{ mt: 1.25 }} flexWrap="wrap" justifyContent="center" useFlexGap>
                 {sportNames(player.sportIds) && (
-                  <Chip label={sportNames(player.sportIds)} sx={{ bgcolor: "rgba(255,255,255,0.12)", color: "#fff" }} />
+                  <Chip
+                    size="small"
+                    label={sportNames(player.sportIds)}
+                    sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "grey.300", fontSize: 12 }}
+                  />
                 )}
-                {player.gender && <Chip label={player.gender} sx={{ bgcolor: "rgba(255,255,255,0.12)", color: "#fff" }} />}
+                {player.gender && (
+                  <Chip size="small" label={player.gender} sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "grey.300", fontSize: 12 }} />
+                )}
                 {basePrice != null && (
-                  <Chip label={`Base ${basePrice}`} variant="outlined" sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.35)" }} />
+                  <Chip
+                    size="small"
+                    label={`Base ${basePrice}`}
+                    variant="outlined"
+                    sx={{ color: "grey.300", borderColor: "rgba(255,255,255,0.3)", fontSize: 12 }}
+                  />
                 )}
               </Stack>
-              {player.aboutMe && (
-                <Box
-                  sx={{
-                    mt: 2.5,
-                    maxWidth: 420,
-                    width: "100%",
-                    maxHeight: 180,
-                    overflowY: "auto",
-                    pr: 1,
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      textAlign: "left",
-                      color: "grey.300",
-                      fontSize: 14,
-                      lineHeight: 1.7,
-                      whiteSpace: "pre-line",
-                    }}
-                  >
-                    {player.aboutMe}
-                  </Typography>
-                </Box>
-              )}
             </Box>
 
-            {/* Price / bid history panel */}
+            {/* Price / description / bid history panel */}
             <Box
               sx={{
                 flex: 1,
@@ -161,7 +164,6 @@ export default function PlayerOnBlockDialog({
                 bgcolor: "rgba(255,255,255,0.03)",
                 borderTop: { xs: "1px solid rgba(255,255,255,0.08)", md: "none" },
                 borderLeft: { md: "1px solid rgba(255,255,255,0.08)" },
-                minHeight: 0,
               }}
             >
               {error && (
@@ -170,7 +172,7 @@ export default function PlayerOnBlockDialog({
                 </Alert>
               )}
 
-              <Stack direction="row" alignItems="center" justifyContent="center" spacing={4} sx={{ mb: 4, flexWrap: "wrap" }}>
+              <Stack direction="row" alignItems="center" justifyContent="center" spacing={4} sx={{ mb: 3, flexWrap: "wrap" }}>
                 {deadlineAt && (
                   <Stack alignItems="center" spacing={0.5}>
                     <BidTimer deadlineAt={deadlineAt} totalSeconds={timerSeconds} size={72} />
@@ -202,8 +204,43 @@ export default function PlayerOnBlockDialog({
                 </Box>
               </Stack>
 
+              {/* Description -- promoted up next to the price/leading team, since this is the other
+                  thing the organizer (and the room) actually wants to see clearly while a player is
+                  live. A fixed height with its own scrollbar, not a shrinkable flex child, so it can
+                  never get silently squashed down to a sliver by the rest of the layout. */}
+              {player.aboutMe && (
+                <Box
+                  sx={{
+                    mb: 3,
+                    p: 2,
+                    flexShrink: 0,
+                    height: 160,
+                    overflowY: "auto",
+                    borderRadius: 2,
+                    bgcolor: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <Typography variant="overline" sx={{ color: "primary.light", letterSpacing: 2 }}>
+                    About
+                  </Typography>
+                  <Typography
+                    sx={{
+                      mt: 0.5,
+                      textAlign: "left",
+                      color: "grey.100",
+                      fontSize: 15,
+                      lineHeight: 1.7,
+                      whiteSpace: "pre-line",
+                    }}
+                  >
+                    {player.aboutMe}
+                  </Typography>
+                </Box>
+              )}
+
               {onBidForTeam && (
-                <Box sx={{ mb: 3, p: 2, borderRadius: 2, bgcolor: "rgba(255,255,255,0.05)" }}>
+                <Box sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: "rgba(255,255,255,0.05)" }}>
                   <Typography variant="caption" sx={{ color: "grey.400", display: "block", mb: 1 }}>
                     Bid on behalf of a team (e.g. a rep bidding in person, or no rep online)
                   </Typography>
@@ -247,12 +284,33 @@ export default function PlayerOnBlockDialog({
                 </Box>
               )}
 
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, color: "grey.400" }}>
-                Bid history
-              </Typography>
-              <Box sx={{ flexGrow: 1, overflowY: "auto", pr: 1, minHeight: 0 }}>
-                <BidHistoryList bids={bids} teams={teams} dark highlightTop emptyText="No bids yet -- waiting for the first one." />
-              </Box>
+              <Accordion
+                expanded={historyOpen}
+                onChange={(_, isOpen) => setHistoryOpen(isOpen)}
+                disableGutters
+                square
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.05)",
+                  color: "#fff",
+                  borderRadius: 2,
+                  "&:before": { display: "none" },
+                  boxShadow: "none",
+                }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: "grey.400" }} />}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ color: "grey.200" }}>
+                      Bid history
+                    </Typography>
+                    {bids?.length > 0 && (
+                      <Chip size="small" label={bids.length} sx={{ height: 20, fontSize: 11, bgcolor: "rgba(255,255,255,0.12)", color: "#fff" }} />
+                    )}
+                  </Stack>
+                </AccordionSummary>
+                <AccordionDetails sx={{ maxHeight: 220, overflowY: "auto" }}>
+                  <BidHistoryList bids={bids} teams={teams} dark highlightTop emptyText="No bids yet -- waiting for the first one." />
+                </AccordionDetails>
+              </Accordion>
             </Box>
           </Box>
 
