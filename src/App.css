@@ -62,12 +62,34 @@ html {
 }
 
 @keyframes gradientShift {
-  0%, 100% { 
+  0%, 100% {
     background-position: 0% 50%;
     filter: brightness(1);
   }
   50% {
     background-position: 100% 50%;
     filter: brightness(1.1);
+  }
+}
+
+/* Printing a dashboard page (e.g. the final results report) shouldn't include the app chrome --
+   just the page's own content, which opts into print formatting via the .print-hide/.print-only
+   classes below. */
+@media print {
+  .MuiAppBar-root {
+    display: none !important;
+  }
+  .print-hide {
+    display: none !important;
+  }
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block;
   }
 }

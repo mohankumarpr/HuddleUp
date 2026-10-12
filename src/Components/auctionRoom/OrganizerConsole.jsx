@@ -27,8 +27,9 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import SettingsIcon from "@mui/icons-material/Settings";
 import UndoIcon from "@mui/icons-material/Undo";
 import StarIcon from "@mui/icons-material/Star";
+import ShareIcon from "@mui/icons-material/Share";
 import { useAuth } from "../../context/AuthContext";
-import { subscribeToSports } from "../../utils/firebase/events";
+import { subscribeToEvent, subscribeToSports } from "../../utils/firebase/events";
 import { requeueUnsoldPlayer } from "../../utils/firebase/players";
 import { partitionPoolForAuction } from "../../utils/marquee";
 import {
@@ -52,6 +53,7 @@ import PlayerOnBlockDialog from "./PlayerOnBlockDialog";
 import AuctionStatsBar from "./AuctionStatsBar";
 import SoundToggleButton from "../common/SoundToggleButton";
 import TeamPurseList from "../common/TeamPurseList";
+import ShareSoldDialog from "../common/ShareSoldDialog";
 import LoadingSpinner from "../LoadingSpinner";
 
 function AuctionRulesDialog({ open, ladder, bidTimerSeconds, onClose, onSave }) {
@@ -175,10 +177,14 @@ export default function OrganizerConsole() {
     toggleSound,
   } = useAuctionRoom(eventId);
   const [sports, setSports] = useState([]);
+  const [event, setEvent] = useState(null);
   const [bids, setBids] = useState([]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [shareCard, setShareCard] = useState(null);
+
+  useEffect(() => subscribeToEvent(eventId, setEvent), [eventId]);
 
   useEffect(() => {
     getOrCreateAuctionState(eventId);
@@ -243,16 +249,23 @@ export default function OrganizerConsole() {
   }
 
   function handleConfirmSold() {
-    const playerName = currentPlayer?.name;
-    const teamName = highBidTeam?.name;
+    const playerSnapshot = currentPlayer;
+    const teamSnapshot = highBidTeam;
     const price = state?.currentPrice;
     return run(async () => {
       await confirmSold(eventId, user.uid);
       logActivity(eventId, {
         actorUid: user.uid,
         action: "player_sold",
-        summary: teamName ? `Sold ${playerName} to ${teamName} for ${price}` : `${playerName} went unsold (no bids)`,
+        summary: teamSnapshot
+          ? `Sold ${playerSnapshot?.name} to ${teamSnapshot.name} for ${price}`
+          : `${playerSnapshot?.name} went unsold (no bids)`,
       });
+      // Only a genuine sale (someone actually won the player) is worth a share card -- an
+      // unsold pass-through has nothing worth announcing.
+      if (teamSnapshot) {
+        setShareCard({ player: playerSnapshot, teamName: teamSnapshot.name, teamColor: teamSnapshot.color, price });
+      }
     });
   }
 
@@ -476,17 +489,32 @@ export default function OrganizerConsole() {
                 <Typography color="text.secondary">No players sold yet.</Typography>
               ) : (
                 <List dense sx={{ maxHeight: 420, overflowY: "auto", flexGrow: 1 }}>
-                  {soldPlayers.map((player) => (
-                    <ListItem key={player.id}>
-                      <ListItemAvatar>
-                        <Avatar src={player.photoUrl} alt={player.name} />
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={player.name}
-                        secondary={`${teams.find((t) => t.id === player.soldTeamId)?.name || "Unknown team"} · ${player.soldPrice}`}
-                      />
-                    </ListItem>
-                  ))}
+                  {soldPlayers.map((player) => {
+                    const soldTeam = teams.find((t) => t.id === player.soldTeamId);
+                    return (
+                      <ListItem
+                        key={player.id}
+                        secondaryAction={
+                          <Tooltip title={`Share ${player.name}'s sale`}>
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                setShareCard({ player, teamName: soldTeam?.name || "Unknown team", teamColor: soldTeam?.color, price: player.soldPrice })
+                              }
+                              aria-label={`Share ${player.name}'s sale`}
+                            >
+                              <ShareIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        <ListItemAvatar>
+                          <Avatar src={player.photoUrl} alt={player.name} />
+                        </ListItemAvatar>
+                        <ListItemText primary={player.name} secondary={`${soldTeam?.name || "Unknown team"} · ${player.soldPrice}`} />
+                      </ListItem>
+                    );
+                  })}
                 </List>
               )}
             </Paper>
@@ -556,6 +584,16 @@ export default function OrganizerConsole() {
         onBidForTeam={handleBidForTeam}
         onConfirmSold={handleConfirmSold}
         onMarkUnsold={handleMarkUnsold}
+      />
+
+      <ShareSoldDialog
+        open={Boolean(shareCard)}
+        onClose={() => setShareCard(null)}
+        player={shareCard?.player}
+        teamName={shareCard?.teamName}
+        teamColor={shareCard?.teamColor}
+        price={shareCard?.price}
+        eventName={event?.name}
       />
     </Box>
   );

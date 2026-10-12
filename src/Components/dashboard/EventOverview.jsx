@@ -61,6 +61,7 @@ const NAV = [
   { to: "fixtures", label: "Fixtures", desc: "Round-robin matches and results per sport", icon: <SportsTennisIcon />, color: "#14B8A6" },
   { to: "standings", label: "Standings", desc: "Enter points for each sport", icon: <EmojiEventsIcon />, color: "#8B5CF6" },
   { to: "console", label: "Live auction console", desc: "Run the auction and confirm sales", icon: <GavelIcon />, color: "#EF4444" },
+  { to: "results", label: "Final results", desc: "Printable standings and team rosters", icon: <EmojiEventsIcon />, color: "#F59E0B" },
   { to: "activity", label: "Activity log", desc: "Who did what, and when", icon: <HistoryIcon />, color: "#64748B" },
 ];
 

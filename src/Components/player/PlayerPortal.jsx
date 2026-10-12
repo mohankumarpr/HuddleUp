@@ -9,6 +9,7 @@ import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { getEventBySlug, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import { claimPlayerRecord } from "../../utils/firebase/participants";
 import { subscribeToPlayers } from "../../utils/firebase/players";
+import { subscribeToAuctionState } from "../../utils/firebase/auctionRealtime";
 import { subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
 import { formatDate, sortSportsBySchedule } from "../../utils/format";
 import useDocumentTitle from "../../utils/useDocumentTitle";
@@ -116,6 +117,7 @@ export default function PlayerPortal() {
   const [players, setPlayers] = useState([]);
   const [results, setResults] = useState({});
   const [stats, setStats] = useState({});
+  const [auctionState, setAuctionState] = useState(null);
 
   useEffect(() => {
     (async () => setEvent(await getEventBySlug(eventSlug)))();
@@ -145,6 +147,7 @@ export default function PlayerPortal() {
       subscribeToPlayers(event.id, setPlayers),
       subscribeToResults(event.id, setResults, () => setResults({})),
       subscribeToSportStats(event.id, setStats, () => setStats({})),
+      subscribeToAuctionState(event.id, setAuctionState),
     ];
     return () => unsubs.forEach((u) => u());
   }, [event, isMember]);
@@ -204,13 +207,35 @@ export default function PlayerPortal() {
               return sport ? <Chip key={id} label={sport.name} variant="outlined" /> : null;
             })}
           </Stack>
+          {me?.aboutMe && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: "italic" }}>
+              "{me.aboutMe}"
+            </Typography>
+          )}
           {me && (
-            <Alert severity={me.status === "sold" ? "success" : "info"}>
+            <Alert severity={me.status === "sold" ? "success" : me.status === "on_block" ? "warning" : "info"}>
               {me.status === "sold" && myTeam && (
                 <>You're on team <b>{myTeam.name}</b>{me.soldPrice != null ? ` (bought for ${me.soldPrice})` : ""}.</>
               )}
               {me.status === "pool" && "You're in the auction pool. You'll see your team here once you're picked."}
-              {me.status === "on_block" && "You're on the block right now!"}
+              {me.status === "on_block" && auctionState?.currentPlayerId === me.id ? (
+                <>
+                  You're on the block right now! Current price <b>{auctionState.currentPrice}</b>
+                  {auctionState.currentHighBidTeamId
+                    ? (() => {
+                        const leadingTeam = teams.find((t) => t.id === auctionState.currentHighBidTeamId);
+                        return leadingTeam ? (
+                          <>
+                            {" "}
+                            -- <b>{leadingTeam.name}</b> is leading.
+                          </>
+                        ) : null;
+                      })()
+                    : " -- no bids yet."}
+                </>
+              ) : (
+                me.status === "on_block" && "You're on the block right now!"
+              )}
               {me.status === "unsold" && "You weren't picked in the auction this time."}
             </Alert>
           )}

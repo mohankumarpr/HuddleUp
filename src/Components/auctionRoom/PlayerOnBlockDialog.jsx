@@ -111,6 +111,20 @@ export default function PlayerOnBlockDialog({
                   <Chip label={`Base ${basePrice}`} variant="outlined" sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.35)" }} />
                 )}
               </Stack>
+              {player.aboutMe && (
+                <Typography
+                  sx={{
+                    mt: 2.5,
+                    maxWidth: 360,
+                    textAlign: "center",
+                    fontStyle: "italic",
+                    color: "grey.300",
+                    fontSize: 15,
+                  }}
+                >
+                  "{player.aboutMe}"
+                </Typography>
+              )}
             </Box>
 
             {/* Price / bid history panel */}

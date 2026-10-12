@@ -58,6 +58,11 @@ export default function PlayerOnBlockCard({
                 {sportNames(player.sportIds) || "No sport"}
                 {basePrice != null && ` · Base ${basePrice}`}
               </Typography>
+              {player.aboutMe && (
+                <Typography variant="body2" sx={{ color: "grey.300", fontStyle: "italic", mt: 1 }}>
+                  "{player.aboutMe}"
+                </Typography>
+              )}
             </Box>
             {deadlineAt && (
               <Stack alignItems="center" spacing={0.5}>

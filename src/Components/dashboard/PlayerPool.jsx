@@ -33,9 +33,10 @@ import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import UndoIcon from "@mui/icons-material/Undo";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
+import ShareIcon from "@mui/icons-material/Share";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
-import { subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
+import { subscribeToEvent, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
 import {
   deletePlayer,
   returnPlayerToPool,
@@ -50,6 +51,7 @@ import { logActivity } from "../../utils/firebase/activityLog";
 import { downloadTextFile } from "../../utils/download";
 import { buildResultsCsv } from "../../utils/resultsExport";
 import BidHistoryList from "../common/BidHistoryList";
+import ShareSoldDialog from "../common/ShareSoldDialog";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -102,12 +104,16 @@ export default function PlayerPool() {
   const [transferring, setTransferring] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [marqueeOnly, setMarqueeOnly] = useState(false);
+  const [shareCard, setShareCard] = useState(null);
+  const [event, setEvent] = useState(null);
   const statusFilter = searchParams.get("status") || "";
 
   function setStatusFilter(value) {
     setSearchParams(value ? { status: value } : {}, { replace: true });
     setPage(1);
   }
+
+  useEffect(() => subscribeToEvent(eventId, setEvent), [eventId]);
 
   useEffect(() => {
     const unsubs = [
@@ -377,6 +383,24 @@ export default function PlayerPool() {
                       Sold to {teamName(player.soldTeamId)} for {player.soldPrice}
                     </Typography>
                   )}
+                  {player.aboutMe && (
+                    <Tooltip title={player.aboutMe}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          mt: 1,
+                          fontStyle: "italic",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        "{player.aboutMe}"
+                      </Typography>
+                    </Tooltip>
+                  )}
                   {details && (
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, wordBreak: "break-all" }}>
                       {details}
@@ -401,6 +425,18 @@ export default function PlayerPool() {
                   )}
                   {player.status === "sold" && (
                     <>
+                      <Tooltip title={`Share ${player.name}'s sale`}>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            const soldTeam = teams.find((t) => t.id === player.soldTeamId);
+                            setShareCard({ player, teamName: soldTeam?.name || "Unknown team", teamColor: soldTeam?.color, price: player.soldPrice });
+                          }}
+                          aria-label={`Share ${player.name}'s sale`}
+                        >
+                          <ShareIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title={`Transfer ${player.name} to another team`}>
                         <IconButton size="small" onClick={() => openTransfer(player)} aria-label={`Transfer ${player.name}`}>
                           <SwapHorizIcon fontSize="small" />
@@ -485,6 +521,16 @@ export default function PlayerPool() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ShareSoldDialog
+        open={Boolean(shareCard)}
+        onClose={() => setShareCard(null)}
+        player={shareCard?.player}
+        teamName={shareCard?.teamName}
+        teamColor={shareCard?.teamColor}
+        price={shareCard?.price}
+        eventName={event?.name}
+      />
     </Box>
   );
 }

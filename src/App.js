@@ -28,6 +28,7 @@ import StandingsManager from "./Components/dashboard/StandingsManager";
 import PlayerImport from "./Components/dashboard/PlayerImport";
 import OrganizerInvites from "./Components/dashboard/OrganizerInvites";
 import ActivityLog from "./Components/dashboard/ActivityLog";
+import EventResults from "./Components/dashboard/EventResults";
 import PlayerPortal from "./Components/player/PlayerPortal";
 import PublicEventPage from "./Components/events/PublicEventPage";
 import OrganizerConsole from "./Components/auctionRoom/OrganizerConsole";
@@ -74,6 +75,7 @@ function AppRoutes() {
           <Route path="events/:eventId/import" element={<PlayerImport />} />
           <Route path="events/:eventId/console" element={<OrganizerConsole />} />
           <Route path="events/:eventId/activity" element={<ActivityLog />} />
+          <Route path="events/:eventId/results" element={<EventResults />} />
         </Route>
 
         <Route path="/e/:eventSlug" element={<PublicEventPage />} />
