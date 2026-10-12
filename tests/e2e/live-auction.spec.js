@@ -103,8 +103,8 @@ test("organizer runs an auction, a team rep bids, the sale is confirmed, and the
   // And team A's purse is reduced by exactly the sale price (verified both in the UI and in
   // Firestore directly, since the deduction happens inside a transaction).
   await page.goto(`/app/events/${eventId}/teams`);
-  const teamARow = page.locator("div", { has: page.getByText(teamAName, { exact: true }) }).last();
-  await expect(teamARow.getByText(new RegExp(`Purse\\s+${10000 - expectedBid}\\s*/\\s*10000`))).toBeVisible({
+  const teamARow = page.locator(".MuiPaper-root", { has: page.getByText(teamAName, { exact: true }) }).first();
+  await expect(teamARow.getByText(new RegExp(`${10000 - expectedBid}\\s*/\\s*10000`))).toBeVisible({
     timeout: 15000,
   });
 

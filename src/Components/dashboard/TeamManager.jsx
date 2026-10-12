@@ -9,7 +9,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Grid,
   IconButton,
+  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -248,8 +250,11 @@ export default function TeamManager() {
 
   if (!teams || !event) return <LoadingSpinner />;
 
+  const totalPurseRemaining = teams.reduce((sum, t) => sum + (t.purseRemaining || 0), 0);
+  const totalPurse = teams.reduce((sum, t) => sum + (t.purseTotal || 0), 0);
+
   return (
-    <Box sx={{ maxWidth: 800 }}>
+    <Box>
       <DashboardHero
         title="Teams"
         subtitle="Any number of owners or captains per team. The join PIN + event code let a rep bid live."
@@ -268,28 +273,73 @@ export default function TeamManager() {
         }
       />
 
+      {teams.length > 0 && (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+          <Chip label={`${teams.length} team${teams.length === 1 ? "" : "s"}`} size="small" variant="outlined" />
+          <Chip label={`Purse remaining ${totalPurseRemaining} / ${totalPurse}`} size="small" variant="outlined" color="primary" />
+        </Stack>
+      )}
+
       {deleteError && (
         <Alert severity="error" onClose={() => setDeleteError(null)} sx={{ mb: 2 }}>
           {deleteError}
         </Alert>
       )}
 
-      <Stack spacing={1.5}>
-        {teams.length === 0 && <Typography color="text.secondary">No teams added yet.</Typography>}
+      {teams.length === 0 && (
+        <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>
+          <Typography color="text.secondary">No teams added yet.</Typography>
+        </Paper>
+      )}
+
+      <Grid container spacing={2}>
         {teams.map((team) => {
           const owners = getTeamOwners(team);
+          const spent = Math.max(0, (team.purseTotal || 0) - (team.purseRemaining || 0));
+          const spentPct = team.purseTotal ? Math.min(100, (spent / team.purseTotal) * 100) : 0;
           return (
-            <Paper key={team.id} variant="outlined" sx={{ p: 2 }}>
-              <Stack direction="row" alignItems="flex-start" spacing={2}>
-                <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: team.color, flexShrink: 0, mt: 0.9 }} />
-                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <Typography variant="subtitle1" fontWeight={700}>
-                    {team.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Purse {team.purseRemaining} / {team.purseTotal}
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6} md={4} key={team.id}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  borderTop: 4,
+                  borderTopColor: team.color,
+                }}
+              >
+                <Box sx={{ p: 2, flexGrow: 1 }}>
+                  <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                    <Typography variant="subtitle1" fontWeight={700} sx={{ wordBreak: "break-word" }}>
+                      {team.name}
+                    </Typography>
+                    <Chip label={`PIN ${team.joinPin}`} size="small" sx={{ fontFamily: "monospace", flexShrink: 0 }} />
+                  </Stack>
+
+                  <Box sx={{ mt: 1.5 }}>
+                    <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Purse remaining
+                      </Typography>
+                      <Typography variant="caption" fontWeight={600}>
+                        {team.purseRemaining} / {team.purseTotal}
+                      </Typography>
+                    </Stack>
+                    <LinearProgress
+                      variant="determinate"
+                      value={spentPct}
+                      sx={{
+                        height: 6,
+                        borderRadius: 3,
+                        bgcolor: "action.disabledBackground",
+                        "& .MuiLinearProgress-bar": { bgcolor: team.color, borderRadius: 3 },
+                      }}
+                    />
+                  </Box>
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
                     {owners.length === 0 && (
                       <Typography variant="body2" color="text.secondary">
                         No owners added
@@ -306,8 +356,14 @@ export default function TeamManager() {
                     ))}
                   </Stack>
                 </Box>
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <Chip label={`PIN ${team.joinPin}`} size="small" sx={{ fontFamily: "monospace" }} />
+
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="flex-end"
+                  spacing={0.5}
+                  sx={{ px: 1, py: 0.5, borderTop: 1, borderColor: "divider" }}
+                >
                   <QrCodeButton
                     value={`${window.location.origin}/e/${event.slug}/join?code=${event.joinCode}&team=${team.id}&pin=${team.joinPin}`}
                     label={`${team.name} join QR`}
@@ -317,18 +373,22 @@ export default function TeamManager() {
                       <AutorenewIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <IconButton size="small" onClick={() => setDialog({ open: true, team })} aria-label={`Edit ${team.name}`}>
-                    <EditOutlinedIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" onClick={() => handleDelete(team)} aria-label={`Delete ${team.name}`}>
-                    <DeleteOutlineIcon fontSize="small" />
-                  </IconButton>
+                  <Tooltip title={`Edit ${team.name}`}>
+                    <IconButton size="small" onClick={() => setDialog({ open: true, team })} aria-label={`Edit ${team.name}`}>
+                      <EditOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={`Delete ${team.name}`}>
+                    <IconButton size="small" onClick={() => handleDelete(team)} aria-label={`Delete ${team.name}`}>
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </Stack>
-              </Stack>
-            </Paper>
+              </Paper>
+            </Grid>
           );
         })}
-      </Stack>
+      </Grid>
 
       {deletedTeams.length > 0 && (
         <Box sx={{ mt: 3 }}>

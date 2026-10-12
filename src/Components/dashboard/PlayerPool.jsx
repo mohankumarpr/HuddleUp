@@ -34,6 +34,7 @@ import UndoIcon from "@mui/icons-material/Undo";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import ShareIcon from "@mui/icons-material/Share";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { subscribeToEvent, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
@@ -44,6 +45,7 @@ import {
   subscribeToPlayers,
   transferPlayer,
   updatePlayer,
+  updatePlayerPrivate,
 } from "../../utils/firebase/players";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
@@ -52,6 +54,7 @@ import { downloadTextFile } from "../../utils/download";
 import { buildResultsCsv } from "../../utils/resultsExport";
 import BidHistoryList from "../common/BidHistoryList";
 import ShareSoldDialog from "../common/ShareSoldDialog";
+import EditPlayerDialog from "./EditPlayerDialog";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -105,6 +108,7 @@ export default function PlayerPool() {
   const [deleteError, setDeleteError] = useState(null);
   const [marqueeOnly, setMarqueeOnly] = useState(false);
   const [shareCard, setShareCard] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
   const [event, setEvent] = useState(null);
   const statusFilter = searchParams.get("status") || "";
 
@@ -172,6 +176,12 @@ export default function PlayerPool() {
     } catch (err) {
       setDeleteError(friendlyErrorMessage(err));
     }
+  }
+
+  async function handleEditSave(patch) {
+    await updatePlayer(eventId, editTarget.id, patch.player);
+    await updatePlayerPrivate(eventId, editTarget.id, patch.private);
+    logActivity(eventId, { actorUid: user.uid, action: "player_edited", summary: `Edited ${patch.player.name}'s details` });
   }
 
   async function handleDelete(player) {
@@ -249,13 +259,14 @@ export default function PlayerPool() {
         icon={<PersonIcon />}
         dense
         action={
-          <Stack direction="row" spacing={1}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: "100%" }}>
             <Button
               variant="contained"
               startIcon={<DownloadIcon />}
               onClick={handleExport}
               disabled={players.length === 0}
-              sx={{ bgcolor: "#fff", color: "primary.dark", "&:hover": { bgcolor: "rgba(255,255,255,0.9)" } }}
+              fullWidth
+              sx={{ bgcolor: "#fff", color: "primary.dark", "&:hover": { bgcolor: "rgba(255,255,255,0.9)" }, whiteSpace: "nowrap" }}
             >
               Export CSV
             </Button>
@@ -264,7 +275,8 @@ export default function PlayerPool() {
               startIcon={<UploadFileIcon />}
               component={RouterLink}
               to={`/app/events/${eventId}/import`}
-              sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.5)", "&:hover": { borderColor: "#fff" } }}
+              fullWidth
+              sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.5)", "&:hover": { borderColor: "#fff" }, whiteSpace: "nowrap" }}
             >
               Bulk upload
             </Button>
@@ -409,6 +421,11 @@ export default function PlayerPool() {
                 </Box>
 
                 <Stack direction="row" justifyContent="flex-end" spacing={0.5} sx={{ mt: 1.5, pt: 1, borderTop: 1, borderColor: "divider" }}>
+                  <Tooltip title={`Edit ${player.name}`}>
+                    <IconButton size="small" onClick={() => setEditTarget(player)} aria-label={`Edit ${player.name}`}>
+                      <EditOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                   {player.status === "pool" && (
                     <Tooltip title={player.marquee ? `Unmark ${player.name} as marquee` : `Mark ${player.name} as a marquee player`}>
                       <IconButton size="small" onClick={() => handleToggleMarquee(player)} aria-label={`Toggle marquee for ${player.name}`}>
@@ -530,6 +547,15 @@ export default function PlayerPool() {
         teamColor={shareCard?.teamColor}
         price={shareCard?.price}
         eventName={event?.name}
+      />
+
+      <EditPlayerDialog
+        open={Boolean(editTarget)}
+        player={editTarget}
+        privateInfo={privateById[editTarget?.id]}
+        sports={sports}
+        onClose={() => setEditTarget(null)}
+        onSave={handleEditSave}
       />
     </Box>
   );

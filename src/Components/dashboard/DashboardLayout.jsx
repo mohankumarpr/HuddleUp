@@ -15,6 +15,7 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import GavelIcon from "@mui/icons-material/Gavel";
 import GroupsIcon from "@mui/icons-material/Groups";
 import LightModeIcon from "@mui/icons-material/LightMode";
@@ -32,6 +33,10 @@ export default function DashboardLayout() {
   // The live auction console needs real screen width to show the pool/sold/unsold columns side by
   // side -- every other dashboard page is fine at the normal reading width.
   const isFullWidthPage = /\/console$/.test(location.pathname);
+  // Any page nested under a specific event (sports, teams, console, etc.) gets a "Back to event"
+  // link to the event overview -- added here once instead of in every page.
+  const eventSubpageMatch = location.pathname.match(/^\/app\/events\/([^/]+)\/.+$/);
+  const backToEventHref = eventSubpageMatch ? `/app/events/${eventSubpageMatch[1]}` : null;
 
   const initials = (profile?.displayName || profile?.email || "?").trim()[0]?.toUpperCase();
 
@@ -146,6 +151,17 @@ export default function DashboardLayout() {
       </AppBar>
 
       <Container maxWidth={isFullWidthPage ? false : "lg"} sx={{ py: { xs: 2.5, sm: 4 } }}>
+        {backToEventHref && (
+          <Button
+            component={RouterLink}
+            to={backToEventHref}
+            size="small"
+            startIcon={<ArrowBackIcon fontSize="small" />}
+            sx={{ mb: 2 }}
+          >
+            Back to event
+          </Button>
+        )}
         <Outlet />
       </Container>
     </Box>

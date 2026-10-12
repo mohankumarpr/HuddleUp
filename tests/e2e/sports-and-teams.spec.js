@@ -21,12 +21,14 @@ test("organizer adds a sport and two teams with purses", async ({ page }) => {
   await addTeam(page, eventId, { name: teamAName, purseTotal: 8000 });
   await addTeam(page, eventId, { name: teamBName, purseTotal: 12000 });
 
-  // Both teams show up, each with its own purse total reflected in the UI.
-  const teamARow = page.locator("div", { has: page.getByText(teamAName, { exact: true }) }).last();
-  await expect(teamARow.getByText(/Purse\s+8000\s*\/\s*8000/)).toBeVisible();
+  // Both teams show up, each with its own purse total reflected in the UI. Scoped to the team's
+  // card (the MuiPaper wrapper) rather than a generic div, since the card's internal name/PIN/purse
+  // markup is split across several nested divs.
+  const teamARow = page.locator(".MuiPaper-root", { has: page.getByText(teamAName, { exact: true }) }).first();
+  await expect(teamARow.getByText(/8000\s*\/\s*8000/)).toBeVisible();
 
-  const teamBRow = page.locator("div", { has: page.getByText(teamBName, { exact: true }) }).last();
-  await expect(teamBRow.getByText(/Purse\s+12000\s*\/\s*12000/)).toBeVisible();
+  const teamBRow = page.locator(".MuiPaper-root", { has: page.getByText(teamBName, { exact: true }) }).first();
+  await expect(teamBRow.getByText(/12000\s*\/\s*12000/)).toBeVisible();
 
   // Back on the event overview, both teams and the sport are reflected in the summary (each name
   // legitimately appears twice there -- once in the Teams card, once in the Standings widget's

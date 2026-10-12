@@ -10,11 +10,13 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  Grid,
   IconButton,
   Paper,
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
@@ -343,7 +345,7 @@ export default function SportManager() {
   if (!sports) return <LoadingSpinner />;
 
   return (
-    <Box sx={{ maxWidth: 800 }}>
+    <Box>
       <DashboardHero
         title="Sports"
         subtitle="Dates, rules and participant counts can be added or changed at any time."
@@ -362,30 +364,47 @@ export default function SportManager() {
         }
       />
 
+      {sports.length > 0 && (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+          <Chip label={`${sports.length} sport${sports.length === 1 ? "" : "s"}`} size="small" variant="outlined" />
+          <Chip
+            label={`${sports.filter((s) => s.active !== false).length} open for registration`}
+            size="small"
+            variant="outlined"
+            color="success"
+          />
+        </Stack>
+      )}
+
       {deleteError && (
         <Alert severity="error" onClose={() => setDeleteError(null)} sx={{ mb: 2 }}>
           {deleteError}
         </Alert>
       )}
 
-      <Stack spacing={1.5}>
-        {sports.length === 0 && <Typography color="text.secondary">No sports added yet.</Typography>}
+      {sports.length === 0 && (
+        <Paper variant="outlined" sx={{ p: 4, textAlign: "center" }}>
+          <Typography color="text.secondary">No sports added yet.</Typography>
+        </Paper>
+      )}
+
+      <Grid container spacing={2}>
         {sports.map((sport) => (
-          <Paper key={sport.id} variant="outlined" sx={{ p: 2 }}>
-            <Stack direction="row" alignItems="flex-start" spacing={1}>
-              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
-                  <Typography variant="subtitle1" fontWeight={700}>
+          <Grid item xs={12} sm={6} md={4} key={sport.id}>
+            <Paper variant="outlined" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+              <Box sx={{ p: 2, flexGrow: 1 }}>
+                <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ wordBreak: "break-word" }}>
                     {sport.name}
                   </Typography>
-                  {sport.active === false && <Chip label="closed" size="small" />}
+                  {sport.active === false && <Chip label="Closed" size="small" sx={{ flexShrink: 0 }} />}
                 </Stack>
                 {sport.description && (
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     {sport.description}
                   </Typography>
                 )}
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
                   <Chip
                     size="small"
                     variant="outlined"
@@ -406,26 +425,37 @@ export default function SportManager() {
                     color={sport.rules ? "success" : "default"}
                   />
                 </Stack>
+              </Box>
+
+              <Stack
+                direction="row"
+                alignItems="center"
+                sx={{ px: 1, py: 0.5, borderTop: 1, borderColor: "divider" }}
+              >
                 <Button
                   size="small"
                   component={RouterLink}
                   to={`/app/events/${eventId}/fixtures?sport=${sport.id}`}
                   startIcon={<EmojiEventsIcon fontSize="small" />}
-                  sx={{ mt: 1 }}
+                  sx={{ mr: "auto" }}
                 >
-                  Manage fixtures
+                  Fixtures
                 </Button>
-              </Box>
-              <IconButton size="small" onClick={() => setDialog({ open: true, sport })} aria-label={`Edit ${sport.name}`}>
-                <EditOutlinedIcon fontSize="small" />
-              </IconButton>
-              <IconButton size="small" onClick={() => handleDelete(sport)} aria-label={`Delete ${sport.name}`}>
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
-            </Stack>
-          </Paper>
+                <Tooltip title={`Edit ${sport.name}`}>
+                  <IconButton size="small" onClick={() => setDialog({ open: true, sport })} aria-label={`Edit ${sport.name}`}>
+                    <EditOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title={`Delete ${sport.name}`}>
+                  <IconButton size="small" onClick={() => handleDelete(sport)} aria-label={`Delete ${sport.name}`}>
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            </Paper>
+          </Grid>
         ))}
-      </Stack>
+      </Grid>
 
       {deletedSports.length > 0 && (
         <Box sx={{ mt: 3 }}>
