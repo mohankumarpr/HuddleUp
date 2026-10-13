@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from "r
 import "./App.css";
 import { AuthProvider } from "./context/AuthContext";
 import { ConfirmProvider } from "./context/ConfirmContext";
+import { NavigationGuardProvider } from "./context/NavigationGuardContext";
 import ErrorBoundary from "./Components/common/ErrorBoundary";
 import ConnectivityBanner from "./Components/common/ConnectivityBanner";
 import Navbar from "./Components/Navbar";
@@ -96,14 +97,16 @@ function App() {
     <AuthProvider>
       <ConfirmProvider>
         <Router>
-          <div className="wrapper">
-            <Navbar />
-            <ConnectivityBanner />
-            <div className="main-panel">
-              <AppRoutes />
+          <NavigationGuardProvider>
+            <div className="wrapper">
+              <Navbar />
+              <ConnectivityBanner />
+              <div className="main-panel">
+                <AppRoutes />
+              </div>
+              <Footer />
             </div>
-            <Footer />
-          </div>
+          </NavigationGuardProvider>
         </Router>
       </ConfirmProvider>
     </AuthProvider>

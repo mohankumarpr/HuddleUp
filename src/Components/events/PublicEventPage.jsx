@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
-import { Box, Button, Container, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Container, Stack, Typography } from "@mui/material";
 import { motion } from "framer-motion";
 import EventIcon from "@mui/icons-material/Event";
 import PlaceIcon from "@mui/icons-material/Place";
@@ -8,7 +8,9 @@ import HowToRegIcon from "@mui/icons-material/HowToReg";
 import GavelIcon from "@mui/icons-material/Gavel";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import LoginIcon from "@mui/icons-material/Login";
-import { getEventBySlug, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
+import { useAuth } from "../../context/AuthContext";
+import { getEventBySlug, getTeamRep, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
+import { subscribeToAuctionState } from "../../utils/firebase/auctionRealtime";
 import { subscribeToResults, subscribeToSportStats } from "../../utils/firebase/results";
 import { formatDate, sortSportsBySchedule } from "../../utils/format";
 import useDocumentTitle from "../../utils/useDocumentTitle";
@@ -21,11 +23,14 @@ const HERO_FALLBACK =
 
 export default function PublicEventPage() {
   const { eventSlug } = useParams();
+  const { user } = useAuth();
   const [event, setEvent] = useState(undefined);
   const [teams, setTeams] = useState([]);
   const [sports, setSports] = useState([]);
   const [results, setResults] = useState({});
   const [stats, setStats] = useState({});
+  const [auctionState, setAuctionState] = useState(null);
+  const [teamRep, setTeamRep] = useState(null);
 
   useEffect(() => {
     (async () => setEvent(await getEventBySlug(eventSlug)))();
@@ -38,9 +43,20 @@ export default function PublicEventPage() {
       subscribeToSports(event.id, setSports),
       subscribeToResults(event.id, setResults, () => setResults({})),
       subscribeToSportStats(event.id, setStats, () => setStats({})),
+      subscribeToAuctionState(event.id, setAuctionState),
     ];
     return () => unsubs.forEach((u) => u());
   }, [event]);
+
+  // If this visitor happens to be a joined team rep for this event, point them straight back to
+  // the bidding screen instead of "Watch live" -- they're a participant, not a spectator.
+  useEffect(() => {
+    if (!event || !user) {
+      setTeamRep(null);
+      return;
+    }
+    (async () => setTeamRep(await getTeamRep(event.id, user.uid)))();
+  }, [event, user]);
 
   const orderedSports = useMemo(() => sortSportsBySchedule(sports), [sports]);
   useDocumentTitle(event ? `${event.name} -- ${APP_NAME}` : undefined);
@@ -102,6 +118,26 @@ export default function PublicEventPage() {
           <Typography color="text.secondary" sx={{ mb: 3, maxWidth: 640 }}>
             {event.description}
           </Typography>
+        )}
+
+        {auctionState?.status === "live" && (
+          <Alert
+            severity="success"
+            sx={{ mb: 3 }}
+            action={
+              <Button
+                component={RouterLink}
+                to={teamRep ? `/e/${event.slug}/bid` : `/e/${event.slug}/watch`}
+                variant="contained"
+                size="small"
+                color="success"
+              >
+                {teamRep ? "Back to bid" : "View auction"}
+              </Button>
+            }
+          >
+            The live auction is happening right now!
+          </Alert>
         )}
 
         <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 5 }}>

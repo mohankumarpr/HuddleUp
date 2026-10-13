@@ -37,7 +37,10 @@ import ShareIcon from "@mui/icons-material/Share";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
-import { subscribeToEvent, subscribeToSports, subscribeToTeams } from "../../utils/firebase/events";
+import { genderMeta } from "../../utils/gender";
+import GenderBadge from "../common/GenderBadge";
+import { computeGenderQuota, computePoolGenderTotals, computeTotalSlotsPerTeam } from "../../utils/auctionQuota";
+import { subscribeToEvent, subscribeToSports, subscribeToTeams, updateEvent } from "../../utils/firebase/events";
 import {
   deletePlayer,
   returnPlayerToPool,
@@ -110,6 +113,8 @@ export default function PlayerPool() {
   const [shareCard, setShareCard] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [event, setEvent] = useState(null);
+  const [reservePriceDraft, setReservePriceDraft] = useState("");
+  const [savingReservePrice, setSavingReservePrice] = useState(false);
   const statusFilter = searchParams.get("status") || "";
 
   function setStatusFilter(value) {
@@ -118,6 +123,18 @@ export default function PlayerPool() {
   }
 
   useEffect(() => subscribeToEvent(eventId, setEvent), [eventId]);
+  useEffect(() => {
+    setReservePriceDraft(event?.reserveSlotPrice ? String(event.reserveSlotPrice) : "");
+  }, [event?.reserveSlotPrice]);
+
+  async function handleSaveReservePrice() {
+    setSavingReservePrice(true);
+    try {
+      await updateEvent(eventId, { reserveSlotPrice: Math.max(0, Number(reservePriceDraft) || 0) });
+    } finally {
+      setSavingReservePrice(false);
+    }
+  }
 
   useEffect(() => {
     const unsubs = [
@@ -284,6 +301,61 @@ export default function PlayerPool() {
         }
       />
 
+      {(() => {
+        const numTeams = teams.length;
+        const totalSlotsPerTeam = computeTotalSlotsPerTeam(players.length, numTeams);
+        const genderTotals = computePoolGenderTotals(players);
+        const womenQuota = computeGenderQuota(genderTotals.female, numTeams);
+        const menQuota = computeGenderQuota(genderTotals.male, numTeams);
+        return (
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+              Roster planning
+            </Typography>
+            {numTeams === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Add teams first to see per-team roster targets.
+              </Typography>
+            ) : (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+                <Chip size="small" variant="outlined" label={`${players.length} players · ${numTeams} teams · ${totalSlotsPerTeam} slots/team`} />
+                {genderTotals.female > 0 && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`Women: ${womenQuota.min === womenQuota.max ? womenQuota.min : `${womenQuota.min}-${womenQuota.max}`}/team (${genderTotals.female} total)`}
+                  />
+                )}
+                {genderTotals.male > 0 && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`Men: ${menQuota.min === menQuota.max ? menQuota.min : `${menQuota.min}-${menQuota.max}`}/team (${genderTotals.male} total)`}
+                  />
+                )}
+              </Stack>
+            )}
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
+              <TextField
+                size="small"
+                label="Reserve price per remaining slot"
+                type="number"
+                value={reservePriceDraft}
+                onChange={(e) => setReservePriceDraft(e.target.value)}
+                sx={{ maxWidth: 280 }}
+              />
+              <Button size="small" variant="outlined" disabled={savingReservePrice} onClick={handleSaveReservePrice}>
+                {savingReservePrice ? "Saving..." : "Save"}
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 480 }}>
+                Caps how much a team can bid, so it never leaves them unable to afford this amount for
+                every roster slot still left to fill. Leave at 0 to turn this off.
+              </Typography>
+            </Stack>
+          </Paper>
+        );
+      })()}
+
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
         <TextField
           size="small"
@@ -366,7 +438,15 @@ export default function PlayerPool() {
             <Grid item xs={12} sm={6} md={4} lg={3} key={player.id}>
               <Paper variant="outlined" sx={{ p: 2, height: "100%", display: "flex", flexDirection: "column" }}>
                 <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-                  <Avatar src={player.photoUrl} alt={player.name} sx={{ width: 44, height: 44 }}>
+                  <Avatar
+                    src={player.photoUrl}
+                    alt={player.name}
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      ...(genderMeta(player.gender) && { border: `3px solid ${genderMeta(player.gender).color}` }),
+                    }}
+                  >
                     {player.name?.[0]}
                   </Avatar>
                   <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -376,9 +456,7 @@ export default function PlayerPool() {
                         {player.name}
                       </Typography>
                     </Stack>
-                    <Typography variant="caption" color="text.secondary">
-                      {player.gender || "—"}
-                    </Typography>
+                    <GenderBadge gender={player.gender} sx={{ height: 20, fontSize: 11, mt: 0.25 }} />
                   </Box>
                   <Chip label={player.status.replace("_", " ")} color={STATUS_COLOR[player.status]} size="small" />
                 </Stack>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import {
   Alert,
@@ -8,24 +8,48 @@ import {
   Chip,
   Collapse,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   LinearProgress,
   List,
   ListItem,
   ListItemAvatar,
   ListItemText,
+  MenuItem,
   Paper,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import { motion } from "framer-motion";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { useAuth } from "../../context/AuthContext";
+import { useConfirm } from "../../context/ConfirmContext";
+import { useNavigationGuard } from "../../context/NavigationGuardContext";
 import { getEventBySlug, getTeamRep, subscribeToSports } from "../../utils/firebase/events";
 import { nextIncrement, placeBid } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
+import {
+  cancelSwapRequest,
+  requestSwap,
+  respondToSwapRequest,
+  subscribeToSwapRequests,
+} from "../../utils/firebase/swaps";
+import { playSwapSound } from "../../utils/sound";
+import {
+  computeGenderQuota,
+  computePoolGenderTotals,
+  computeTotalSlotsPerTeam,
+  countTeamRoster,
+  isGenderCapped,
+  maxBidCapForTeam,
+} from "../../utils/auctionQuota";
 import { useAuctionRoom } from "../auctionRoom/useAuctionRoom";
 import PlayerOnBlockCard from "../auctionRoom/PlayerOnBlockCard";
 import AuctionStatsBar from "../auctionRoom/AuctionStatsBar";
@@ -34,9 +58,96 @@ import SoundToggleButton from "../common/SoundToggleButton";
 import TeamPurseList from "../common/TeamPurseList";
 import LoadingSpinner from "../LoadingSpinner";
 
+// Offer another team a price for one of their already-sold players. If they accept, the organizer
+// finalizes it (see OrganizerConsole) -- the player moves to the offering team's roster and the
+// price is added to the selling team's purse.
+function SwapRequestDialog({ open, onClose, myTeam, teams, otherTeamPlayers, onSubmit }) {
+  const [playerId, setPlayerId] = useState("");
+  const [price, setPrice] = useState("");
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setPlayerId("");
+      setPrice("");
+      setError(null);
+    }
+  }, [open]);
+
+  const priceNum = Number(price) || 0;
+  const canAfford = Boolean(myTeam) && priceNum > 0 && priceNum <= myTeam.purseRemaining;
+
+  async function handleSubmit() {
+    const player = otherTeamPlayers.find((p) => p.id === playerId);
+    if (!player || !canAfford) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit({ playerId, targetTeamId: player.soldTeamId, price: priceNum });
+      onClose();
+    } catch (err) {
+      setError(friendlyErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Swap a player</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Offer another team a price for one of their players. If they accept, the organizer
+          finalizes the move -- the player joins your roster and the price goes to their purse.
+          You get one of these for the whole auction.
+        </Typography>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <Stack spacing={2}>
+          <TextField select label="Player" value={playerId} onChange={(e) => setPlayerId(e.target.value)} fullWidth>
+            {otherTeamPlayers.length === 0 && (
+              <MenuItem value="" disabled>
+                No other teams have bought a player yet
+              </MenuItem>
+            )}
+            {otherTeamPlayers.map((p) => {
+              const team = teams.find((t) => t.id === p.soldTeamId);
+              return (
+                <MenuItem key={p.id} value={p.id}>
+                  {p.name} -- {team?.name || "Unknown team"}
+                </MenuItem>
+              );
+            })}
+          </TextField>
+          <TextField
+            label="Price you're offering"
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            fullWidth
+            helperText={myTeam ? `Your remaining purse: ${myTeam.purseRemaining}` : undefined}
+          />
+          {priceNum > 0 && !canAfford && <Alert severity="warning">Your remaining purse can't cover this offer.</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disabled={!playerId || !canAfford || submitting} onClick={handleSubmit}>
+          {submitting ? "Sending..." : "Send offer"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function TeamBidderView() {
   const { eventSlug } = useParams();
   const { user, loading: authLoading } = useAuth();
+  const confirm = useConfirm();
   const [event, setEvent] = useState(undefined); // undefined = loading, null = not found
   const [teamRep, setTeamRep] = useState(undefined); // undefined = loading, null = not joined
   const [sports, setSports] = useState([]);
@@ -46,6 +157,10 @@ export default function TeamBidderView() {
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [soldOpen, setSoldOpen] = useState(false);
   const [unsoldOpen, setUnsoldOpen] = useState(false);
+  const [swapRequests, setSwapRequests] = useState([]);
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [swapActionError, setSwapActionError] = useState(null);
+  const [respondingId, setRespondingId] = useState(null);
 
   useEffect(() => {
     (async () => setEvent(await getEventBySlug(eventSlug)))();
@@ -60,9 +175,37 @@ export default function TeamBidderView() {
     (async () => setTeamRep(await getTeamRep(event.id, user.uid)))();
   }, [event, user, authLoading]);
 
+  // A joined rep shouldn't get bounced off this screen by an accidental tap (the navbar logo, a
+  // browser back/refresh) without a chance to say so first -- they could be mid-bid.
+  const confirmLeaveBidding = teamRep
+    ? () =>
+        confirm({
+          title: "Leave the bidding screen?",
+          description: "You'll stop seeing live bids and won't be able to bid until you come back.",
+          confirmLabel: "Leave",
+          destructive: true,
+        })
+    : null;
+  useNavigationGuard(confirmLeaveBidding, [Boolean(teamRep)]);
+
+  useEffect(() => {
+    if (!teamRep) return undefined;
+    function handleBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [teamRep]);
+
   useEffect(() => {
     if (!event) return undefined;
     return subscribeToSports(event.id, setSports);
+  }, [event]);
+
+  useEffect(() => {
+    if (!event) return undefined;
+    return subscribeToSwapRequests(event.id, setSwapRequests);
   }, [event]);
 
   const room = useAuctionRoom(event?.id);
@@ -75,6 +218,32 @@ export default function TeamBidderView() {
     }
     return subscribeToBidsForPlayer(event.id, room.state.currentPlayerId, setBids);
   }, [event, room.state?.currentPlayerId]);
+
+  // A chime when an offer arrives for this team, or this team's own offer gets accepted -- a swap
+  // can happen at any time, so it shouldn't rely on the rep already looking at this part of the
+  // screen. Seeded silently on the first snapshot so reopening the page doesn't replay old chimes.
+  const swapSeenRef = useRef(null);
+  useEffect(() => {
+    const myTeamId = teamRep?.teamId;
+    if (!myTeamId) return;
+    const relevant = swapRequests.filter(
+      (r) =>
+        (r.status === "pending" && r.targetTeamId === myTeamId) ||
+        (r.status === "accepted" && r.requesterTeamId === myTeamId)
+    );
+    const next = new Map(relevant.map((r) => [r.id, r.status]));
+    if (swapSeenRef.current === null) {
+      swapSeenRef.current = next;
+      return;
+    }
+    const prev = swapSeenRef.current;
+    let notify = false;
+    for (const [id, status] of next) {
+      if (!prev.has(id) || (prev.get(id) !== status && status === "accepted")) notify = true;
+    }
+    if (notify && room.soundEnabled) playSwapSound();
+    swapSeenRef.current = next;
+  }, [swapRequests, teamRep?.teamId, room.soundEnabled]);
 
   function sportNames(sportIds) {
     return (sportIds || []).map((id) => sports.find((s) => s.id === id)?.name).filter(Boolean).join(", ");
@@ -98,10 +267,37 @@ export default function TeamBidderView() {
   const myRoster = room.players.filter((p) => p.status === "sold" && p.soldTeamId === teamRep.teamId);
   const mySpent = myTeam ? myTeam.purseTotal - myTeam.purseRemaining : 0;
   const isLive = Boolean(room.state?.status === "live" && room.state?.currentPlayerId);
+  const biddingOpen = Boolean(room.state?.biddingOpen);
   const alreadyHighBidder = room.state?.currentHighBidTeamId === teamRep.teamId;
   const proposedPrice = room.state ? nextIncrement(room.state.currentPrice, room.state.incrementLadder) : null;
-  const canAfford = Boolean(myTeam && proposedPrice != null && proposedPrice <= myTeam.purseRemaining);
-  const canBid = isLive && Boolean(myTeam) && !alreadyHighBidder && canAfford;
+
+  // Roster planning: an optional max-bid cap (reserve enough purse for every remaining slot) and
+  // an independent men's/women's quota cap -- see auctionQuota.js. Both mirror exactly what
+  // placeBid enforces server-side, so the button's disabled state never contradicts what actually
+  // happens when it's pressed.
+  const numTeams = room.teams.length;
+  const totalSlotsPerTeam = computeTotalSlotsPerTeam(room.players.length, numTeams);
+  const myRosterCounts = countTeamRoster(room.players, teamRep.teamId);
+  const genderTotals = computePoolGenderTotals(room.players);
+  const womenQuota = computeGenderQuota(genderTotals.female, numTeams);
+  const menQuota = computeGenderQuota(genderTotals.male, numTeams);
+  const myBidCap = myTeam
+    ? maxBidCapForTeam({
+        purseRemaining: myTeam.purseRemaining,
+        totalSlotsPerTeam,
+        teamTotalOwned: myRosterCounts.total,
+        reserveSlotPrice: event.reserveSlotPrice,
+      })
+    : Infinity;
+  const currentPlayerGender = room.currentPlayer?.gender;
+  const myGenderCountForCurrent = currentPlayerGender === "female" ? myRosterCounts.female : myRosterCounts.male;
+  const myGenderQuotaMaxForCurrent = currentPlayerGender === "female" ? womenQuota.max : menQuota.max;
+  const genderCapped = isGenderCapped(currentPlayerGender, myGenderCountForCurrent, myGenderQuotaMaxForCurrent);
+
+  const canAffordPurse = Boolean(myTeam && proposedPrice != null && proposedPrice <= myTeam.purseRemaining);
+  const withinReserveCap = Boolean(proposedPrice != null && proposedPrice <= myBidCap);
+  const canAfford = canAffordPurse && withinReserveCap;
+  const canBid = isLive && biddingOpen && Boolean(myTeam) && !alreadyHighBidder && canAfford && !genderCapped;
 
   async function handleBid() {
     setError(null);
@@ -112,6 +308,44 @@ export default function TeamBidderView() {
       setError(friendlyErrorMessage(err));
     } finally {
       setBidding(false);
+    }
+  }
+
+  const otherTeamPlayers = room.soldPlayers.filter((p) => p.soldTeamId !== teamRep.teamId);
+  const myOutgoingSwap = swapRequests.find(
+    (r) => r.requesterTeamId === teamRep.teamId && (r.status === "pending" || r.status === "accepted")
+  );
+  const incomingSwaps = swapRequests.filter((r) => r.targetTeamId === teamRep.teamId && r.status === "pending");
+  const canOfferSwap = Boolean(myTeam) && !myTeam.swapUsed && !myOutgoingSwap;
+
+  async function handleSendSwap({ playerId, targetTeamId, price }) {
+    await requestSwap(event.id, {
+      requesterTeamId: teamRep.teamId,
+      targetTeamId,
+      playerId,
+      price,
+      createdByUid: user.uid,
+    });
+  }
+
+  async function handleCancelSwap(requestId) {
+    setSwapActionError(null);
+    try {
+      await cancelSwapRequest(event.id, requestId);
+    } catch (err) {
+      setSwapActionError(friendlyErrorMessage(err));
+    }
+  }
+
+  async function handleRespondSwap(requestId, accept) {
+    setSwapActionError(null);
+    setRespondingId(requestId);
+    try {
+      await respondToSwapRequest(event.id, requestId, accept, user.uid);
+    } catch (err) {
+      setSwapActionError(friendlyErrorMessage(err));
+    } finally {
+      setRespondingId(null);
     }
   }
 
@@ -164,6 +398,33 @@ export default function TeamBidderView() {
             }}
           />
 
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+            {Boolean(event.reserveSlotPrice) && (
+              <Chip
+                size="small"
+                color={myBidCap < myTeam.purseRemaining ? "warning" : "default"}
+                variant="outlined"
+                label={`Max safe bid: ${Number.isFinite(myBidCap) ? myBidCap : myTeam.purseRemaining}`}
+              />
+            )}
+            {genderTotals.female > 0 && (
+              <Chip
+                size="small"
+                variant="outlined"
+                color={myRosterCounts.female >= womenQuota.max ? "error" : "default"}
+                label={`Women ${myRosterCounts.female}/${womenQuota.max}`}
+              />
+            )}
+            {genderTotals.male > 0 && (
+              <Chip
+                size="small"
+                variant="outlined"
+                color={myRosterCounts.male >= menQuota.max ? "error" : "default"}
+                label={`Men ${myRosterCounts.male}/${menQuota.max}`}
+              />
+            )}
+          </Stack>
+
           <Button
             size="small"
             onClick={() => setRosterOpen((o) => !o)}
@@ -193,6 +454,104 @@ export default function TeamBidderView() {
         </Paper>
       )}
 
+      {myTeam && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} flexWrap="wrap" useFlexGap>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>
+                Swap a player
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {myTeam.swapUsed
+                  ? "You've used your one swap for this auction."
+                  : "Offer any team a price for one of their players -- one use per team, any time."}
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              startIcon={<SwapHorizIcon />}
+              disabled={!canOfferSwap}
+              onClick={() => setSwapDialogOpen(true)}
+            >
+              Swap a player
+            </Button>
+          </Stack>
+
+          {swapActionError && (
+            <Alert severity="error" sx={{ mt: 2 }} onClose={() => setSwapActionError(null)}>
+              {swapActionError}
+            </Alert>
+          )}
+
+          {myOutgoingSwap &&
+            (() => {
+              const player = room.players.find((p) => p.id === myOutgoingSwap.playerId);
+              const targetTeam = room.teams.find((t) => t.id === myOutgoingSwap.targetTeamId);
+              return (
+                <Alert
+                  severity={myOutgoingSwap.status === "accepted" ? "success" : "info"}
+                  sx={{ mt: 2 }}
+                  action={
+                    myOutgoingSwap.status === "pending" && (
+                      <Button color="inherit" size="small" onClick={() => handleCancelSwap(myOutgoingSwap.id)}>
+                        Withdraw
+                      </Button>
+                    )
+                  }
+                >
+                  {myOutgoingSwap.status === "accepted"
+                    ? `${targetTeam?.name || "They"} agreed to your offer of ${myOutgoingSwap.price} for ${player?.name || "that player"} -- waiting for the organizer to confirm it.`
+                    : `Waiting for ${targetTeam?.name || "the other team"} to respond to your offer of ${myOutgoingSwap.price} for ${player?.name || "that player"}.`}
+                </Alert>
+              );
+            })()}
+
+          {incomingSwaps.map((req) => {
+            const player = room.players.find((p) => p.id === req.playerId);
+            const fromTeam = room.teams.find((t) => t.id === req.requesterTeamId);
+            return (
+              <Alert
+                key={req.id}
+                severity="warning"
+                sx={{ mt: 2 }}
+                action={
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      color="inherit"
+                      size="small"
+                      disabled={respondingId === req.id}
+                      onClick={() => handleRespondSwap(req.id, false)}
+                    >
+                      Decline
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={respondingId === req.id}
+                      onClick={() => handleRespondSwap(req.id, true)}
+                    >
+                      Accept
+                    </Button>
+                  </Stack>
+                }
+              >
+                {fromTeam?.name || "Another team"} wants to buy {player?.name || "this player"} from you for{" "}
+                {req.price}.
+              </Alert>
+            );
+          })}
+        </Paper>
+      )}
+
+      <SwapRequestDialog
+        open={swapDialogOpen}
+        onClose={() => setSwapDialogOpen(false)}
+        myTeam={myTeam}
+        teams={room.teams}
+        otherTeamPlayers={otherTeamPlayers}
+        onSubmit={handleSendSwap}
+      />
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
@@ -208,6 +567,7 @@ export default function TeamBidderView() {
           basePrice={room.currentPlayer ? room.state?.basePrice : null}
           deadlineAt={room.state?.blockDeadlineAt}
           timerSeconds={room.state?.bidTimerSeconds}
+          biddingOpen={biddingOpen}
         />
       </Box>
 
@@ -233,8 +593,14 @@ export default function TeamBidderView() {
             ? "You're leading"
             : !isLive
             ? "Waiting for auction"
-            : !canAfford
+            : !biddingOpen
+            ? "Waiting for organizer to start bidding"
+            : genderCapped
+            ? "Your squad is full for this gender"
+            : !canAffordPurse
             ? "Insufficient purse"
+            : !withinReserveCap
+            ? "Over your reserve-safe limit"
             : `Bid ${proposedPrice}`}
         </Button>
       </motion.div>
@@ -251,7 +617,7 @@ export default function TeamBidderView() {
       </Button>
       <Collapse in={teamsOpen}>
         <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-          <TeamPurseList teams={room.teams} highlightTeamId={teamRep.teamId} />
+          <TeamPurseList teams={room.teams} highlightTeamId={teamRep.teamId} players={room.players} />
         </Paper>
       </Collapse>
 

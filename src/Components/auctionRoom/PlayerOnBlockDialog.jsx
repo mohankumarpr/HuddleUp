@@ -20,6 +20,16 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import GavelIcon from "@mui/icons-material/Gavel";
 import BidTimer from "./BidTimer";
 import BidHistoryList from "../common/BidHistoryList";
+import GenderBadge from "../common/GenderBadge";
+import SwapRequestsPanel from "../common/SwapRequestsPanel";
+import {
+  computeGenderQuota,
+  computePoolGenderTotals,
+  computeTotalSlotsPerTeam,
+  countTeamRoster,
+  isGenderCapped,
+  maxBidCapForTeam,
+} from "../../utils/auctionQuota";
 
 // The whole "player on the block" experience as a full-screen takeover -- it can only be closed by
 // resolving the player (sold or unsold), never by a backdrop click or Escape, so the organizer
@@ -44,6 +54,12 @@ export default function PlayerOnBlockDialog({
   onBidForTeam,
   onConfirmSold,
   onMarkUnsold,
+  biddingOpen,
+  onStartBidding,
+  allPlayers,
+  swapRequests,
+  onCompleteSwap,
+  reserveSlotPrice,
 }) {
   const accent = highBidTeam?.color || "#6366F1";
   const [proxyTeamId, setProxyTeamId] = useState("");
@@ -57,7 +73,31 @@ export default function PlayerOnBlockDialog({
 
   const proxyCandidates = teams.filter((t) => t.id !== highBidTeam?.id);
   const proxyTeam = teams.find((t) => t.id === proxyTeamId);
-  const proxyCanAfford = !proxyTeam || nextBidAmount == null || proxyTeam.purseRemaining >= nextBidAmount;
+
+  // Same two caps TeamBidderView shows its own rep -- an organizer placing a bid "for" a team goes
+  // through the exact same placeBid() the rep's own Bid button does, so it's subject to the exact
+  // same limits; surfacing them here avoids a confusing server rejection after the click.
+  const players = allPlayers || [];
+  const numTeams = teams.length;
+  const totalSlotsPerTeam = computeTotalSlotsPerTeam(players.length, numTeams);
+  const genderTotals = computePoolGenderTotals(players);
+  const genderQuotaMax = computeGenderQuota(genderTotals[player?.gender] || 0, numTeams).max;
+  const proxyRoster = proxyTeam ? countTeamRoster(players, proxyTeam.id) : null;
+  const proxyBidCap = proxyTeam
+    ? maxBidCapForTeam({
+        purseRemaining: proxyTeam.purseRemaining,
+        totalSlotsPerTeam,
+        teamTotalOwned: proxyRoster.total,
+        reserveSlotPrice,
+      })
+    : Infinity;
+  const proxyGenderCapped = proxyTeam
+    ? isGenderCapped(player?.gender, player?.gender === "female" ? proxyRoster.female : proxyRoster.male, genderQuotaMax)
+    : false;
+  const proxyCanAfford =
+    !proxyTeam ||
+    nextBidAmount == null ||
+    (proxyTeam.purseRemaining >= nextBidAmount && nextBidAmount <= proxyBidCap && !proxyGenderCapped);
 
   return (
     <Dialog
@@ -139,9 +179,7 @@ export default function PlayerOnBlockDialog({
                     sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "grey.300", fontSize: 12 }}
                   />
                 )}
-                {player.gender && (
-                  <Chip size="small" label={player.gender} sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "grey.300", fontSize: 12 }} />
-                )}
+                <GenderBadge gender={player.gender} sx={{ fontSize: 12 }} />
                 {basePrice != null && (
                   <Chip
                     size="small"
@@ -172,6 +210,19 @@ export default function PlayerOnBlockDialog({
                 </Alert>
               )}
 
+              {/* A swap offer can land at any time, including right now -- surfaced here too (not
+                  just on the console behind this full-screen dialog) so it's never missed. */}
+              {swapRequests && (
+                <SwapRequestsPanel
+                  swapRequests={swapRequests}
+                  players={allPlayers || []}
+                  teams={teams}
+                  busy={busy}
+                  onComplete={onCompleteSwap}
+                  sx={{ mb: 3 }}
+                />
+              )}
+
               <Stack direction="row" alignItems="center" justifyContent="center" spacing={4} sx={{ mb: 3, flexWrap: "wrap" }}>
                 {deadlineAt && (
                   <Stack alignItems="center" spacing={0.5}>
@@ -196,13 +247,31 @@ export default function PlayerOnBlockDialog({
                     />
                   ) : (
                     <Chip
-                      label="No bids yet"
+                      label={biddingOpen ? "No bids yet" : "Bidding not open yet"}
                       variant="outlined"
                       sx={{ mt: 1.5, color: "#fff", borderColor: "rgba(255,255,255,0.4)" }}
                     />
                   )}
                 </Box>
               </Stack>
+
+              {onStartBidding && !biddingOpen && (
+                <Box sx={{ textAlign: "center", mb: 3 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<GavelIcon />}
+                    disabled={busy}
+                    onClick={onStartBidding}
+                    sx={{ px: 4, py: 1.5, fontSize: 18 }}
+                  >
+                    Start bidding
+                  </Button>
+                  <Typography variant="body2" sx={{ mt: 1, color: "grey.400" }}>
+                    Teams can't bid until you open it.
+                  </Typography>
+                </Box>
+              )}
 
               {/* Description -- promoted up next to the price/leading team, since this is the other
                   thing the organizer (and the room) actually wants to see clearly while a player is
@@ -212,9 +281,9 @@ export default function PlayerOnBlockDialog({
                 <Box
                   sx={{
                     mb: 3,
-                    p: 2,
+                    p: 2.5,
                     flexShrink: 0,
-                    height: 160,
+                    height: 210,
                     overflowY: "auto",
                     borderRadius: 2,
                     bgcolor: "rgba(255,255,255,0.06)",
@@ -229,8 +298,8 @@ export default function PlayerOnBlockDialog({
                       mt: 0.5,
                       textAlign: "left",
                       color: "grey.100",
-                      fontSize: 15,
-                      lineHeight: 1.7,
+                      fontSize: 19,
+                      lineHeight: 1.65,
                       whiteSpace: "pre-line",
                     }}
                   >
@@ -239,7 +308,7 @@ export default function PlayerOnBlockDialog({
                 </Box>
               )}
 
-              {onBidForTeam && (
+              {onBidForTeam && biddingOpen && (
                 <Box sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: "rgba(255,255,255,0.05)" }}>
                   <Typography variant="caption" sx={{ color: "grey.400", display: "block", mb: 1 }}>
                     Bid on behalf of a team (e.g. a rep bidding in person, or no rep online)
@@ -258,11 +327,26 @@ export default function PlayerOnBlockDialog({
                         "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.3)" },
                       }}
                     >
-                      {proxyCandidates.map((t) => (
-                        <MenuItem key={t.id} value={t.id}>
-                          {t.name} (purse {t.purseRemaining})
-                        </MenuItem>
-                      ))}
+                      {proxyCandidates.map((t) => {
+                        const roster = countTeamRoster(players, t.id);
+                        const capped = isGenderCapped(
+                          player?.gender,
+                          player?.gender === "female" ? roster.female : roster.male,
+                          genderQuotaMax
+                        );
+                        const cap = maxBidCapForTeam({
+                          purseRemaining: t.purseRemaining,
+                          totalSlotsPerTeam,
+                          teamTotalOwned: roster.total,
+                          reserveSlotPrice,
+                        });
+                        return (
+                          <MenuItem key={t.id} value={t.id} disabled={capped}>
+                            {t.name} (purse {t.purseRemaining}
+                            {Number.isFinite(cap) ? `, max bid ${cap}` : ""}){capped ? " -- gender quota full" : ""}
+                          </MenuItem>
+                        );
+                      })}
                     </TextField>
                     <Button
                       variant="contained"
@@ -278,7 +362,11 @@ export default function PlayerOnBlockDialog({
                   </Stack>
                   {proxyTeamId && !proxyCanAfford && (
                     <Typography variant="caption" color="error.light" sx={{ display: "block", mt: 0.5 }}>
-                      {proxyTeam?.name}'s remaining purse can't cover this bid.
+                      {proxyGenderCapped
+                        ? `${proxyTeam?.name} already has its maximum number of players of this gender.`
+                        : nextBidAmount > proxyBidCap
+                        ? `${proxyTeam?.name} needs to keep enough purse for its remaining roster slots.`
+                        : `${proxyTeam?.name}'s remaining purse can't cover this bid.`}
                     </Typography>
                   )}
                 </Box>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
@@ -19,6 +19,7 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useRequestNavigation } from '../context/NavigationGuardContext';
 import { APP_NAME } from '../branding';
 
 function Navbar() {
@@ -26,11 +27,25 @@ function Navbar() {
   const location = useLocation();
   const { isOrganizer } = useAuth();
   const { mode, toggleMode } = useThemeMode();
+  const requestNavigation = useRequestNavigation();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // The organizer dashboard (DashboardLayout) has its own branded, mobile-responsive top bar --
   // this marketing navbar would just duplicate it.
   if (location.pathname.startsWith('/app')) return null;
+
+  // On a public event page, the brand mark should bring a visitor back to that event's own page,
+  // not away to the unrelated marketing site -- that's what "home" means to someone who arrived
+  // via an event link and has never seen the marketing site at all.
+  const eventSlugMatch = location.pathname.match(/^\/e\/([^/]+)/);
+  const logoDestination = eventSlugMatch ? `/e/${eventSlugMatch[1]}` : '/';
+
+  // Every navigation this navbar triggers goes through the currently-mounted page's guard (if any)
+  // first -- see NavigationGuardContext. Today that's only the live bidding screen, which asks for
+  // confirmation before letting a rep get bounced off it mid-auction by an accidental logo tap.
+  async function go(destination) {
+    if (await requestNavigation()) navigate(destination);
+  }
 
   const navLinks = [
     { label: 'Home', to: '/' },
@@ -49,7 +64,7 @@ function Navbar() {
           alignItems="center"
           spacing={1}
           sx={{ cursor: 'pointer', flexGrow: 1 }}
-          onClick={() => navigate('/')}
+          onClick={() => go(logoDestination)}
         >
           <GavelIcon sx={{ color: 'primary.main' }} />
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -61,8 +76,7 @@ function Navbar() {
           {navLinks.map((link) => (
             <Button
               key={link.to}
-              component={RouterLink}
-              to={link.to}
+              onClick={() => go(link.to)}
               sx={{
                 color: location.pathname === link.to ? 'primary.light' : 'grey.200',
                 fontWeight: 600,
@@ -81,7 +95,7 @@ function Navbar() {
           </IconButton>
 
           {!isOrganizer && (
-            <Button variant="contained" component={RouterLink} to="/signup">
+            <Button variant="contained" onClick={() => go('/signup')}>
               Get started
             </Button>
           )}
@@ -108,12 +122,12 @@ function Navbar() {
         <Box sx={{ width: 240 }} role="presentation" onClick={() => setDrawerOpen(false)}>
           <List>
             {navLinks.map((link) => (
-              <ListItemButton key={link.to} component={RouterLink} to={link.to}>
+              <ListItemButton key={link.to} onClick={() => go(link.to)}>
                 <ListItemText primary={link.label} />
               </ListItemButton>
             ))}
             {!isOrganizer && (
-              <ListItemButton component={RouterLink} to="/signup">
+              <ListItemButton onClick={() => go('/signup')}>
                 <ListItemText primary="Get started" />
               </ListItemButton>
             )}

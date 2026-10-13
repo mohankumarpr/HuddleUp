@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   increment,
   onSnapshot,
   orderBy,
@@ -14,6 +15,14 @@ import {
 } from "firebase/firestore";
 import { db } from "./config";
 import { AppError } from "./errors";
+import {
+  computeGenderQuota,
+  computePoolGenderTotals,
+  computeTotalSlotsPerTeam,
+  countTeamRoster,
+  isGenderCapped,
+  maxBidCapForTeam,
+} from "../auctionQuota";
 
 export const DEFAULT_LADDER = [
   { upTo: 1000, increment: 50 },
@@ -54,6 +63,10 @@ export async function getOrCreateAuctionState(eventId) {
     currentHighBidTeamId: null,
     currentHighBidderUid: null,
     basePrice: 0,
+    // false the instant a player goes on the block -- bidding only opens once the organizer
+    // explicitly clicks "Start bidding", so everyone has a moment to see who's up before the
+    // clock (if any) starts and reps can act.
+    biddingOpen: false,
     incrementLadder: DEFAULT_LADDER,
     // 0 = no timer (organizer paces manually, the original behavior). When set, every bid pushes
     // the deadline back by this many seconds, so the clock always reflects "time since the last
@@ -85,7 +98,7 @@ export async function updateAuctionRules(eventId, { incrementLadder, bidTimerSec
 // since only one organizer console drives these at a time and a harmless double-write from two
 // organizer tabs isn't a correctness problem the way a mis-priced sale would be.
 
-export async function startPlayerOnBlock(eventId, player, organizerUid, bidTimerSeconds = 0) {
+export async function startPlayerOnBlock(eventId, player, organizerUid) {
   await updateDoc(stateRef(eventId), {
     status: "live",
     currentPlayerId: player.id,
@@ -93,7 +106,10 @@ export async function startPlayerOnBlock(eventId, player, organizerUid, bidTimer
     basePrice: player.basePrice,
     currentHighBidTeamId: null,
     currentHighBidderUid: null,
-    blockDeadlineAt: bidTimerSeconds ? Date.now() + bidTimerSeconds * 1000 : null,
+    // Bidding starts closed -- the player is shown, but no one can bid until the organizer opens
+    // it with startBidding(), which is also when the countdown (if any) begins.
+    biddingOpen: false,
+    blockDeadlineAt: null,
     // Starting a new pick retires any pending undo -- reverting a sale from a few players ago
     // while a new one is already on the block would be confusing, not helpful.
     undo: null,
@@ -102,6 +118,18 @@ export async function startPlayerOnBlock(eventId, player, organizerUid, bidTimer
     updatedBy: organizerUid,
   });
   await updateDoc(doc(db, "events", eventId, "players", player.id), { status: "on_block" });
+}
+
+// Opens the block the organizer just set up for actual bids -- the moment team reps' Bid buttons
+// become enabled, and (if a timer is configured) when the countdown actually starts.
+export async function startBidding(eventId, organizerUid, bidTimerSeconds = 0) {
+  await updateDoc(stateRef(eventId), {
+    biddingOpen: true,
+    blockDeadlineAt: bidTimerSeconds ? Date.now() + bidTimerSeconds * 1000 : null,
+    version: increment(1),
+    updatedAt: serverTimestamp(),
+    updatedBy: organizerUid,
+  });
 }
 
 export async function setAuctionStatus(eventId, status, organizerUid) {
@@ -128,9 +156,23 @@ export async function extendBlockTimer(eventId, seconds, organizerUid) {
 export async function placeBid(eventId, teamId, repUid) {
   const sRef = stateRef(eventId);
   const tRef = doc(db, "events", eventId, "teams", teamId);
+  const eRef = doc(db, "events", eventId);
+
+  // Firestore transactions can only tx.get() specific document references, not run a query -- so
+  // the full players/teams lists for the roster-quota checks below are read as a plain snapshot
+  // just before the transaction starts. These are soft planning constraints, not money-safety
+  // critical the way purseRemaining is (that's still re-read transactionally below, same as
+  // always); a vanishingly rare race against a concurrent sale/transfer landing in this instant is
+  // an acceptable tradeoff for not being able to scan a whole collection atomically.
+  const [playersSnap, teamsSnap] = await Promise.all([
+    getDocs(collection(db, "events", eventId, "players")),
+    getDocs(collection(db, "events", eventId, "teams")),
+  ]);
+  const players = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const numTeams = teamsSnap.docs.filter((d) => !d.data().deleted).length;
 
   return runTransaction(db, async (tx) => {
-    const [stateSnap, teamSnap] = await Promise.all([tx.get(sRef), tx.get(tRef)]);
+    const [stateSnap, teamSnap, eventSnap] = await Promise.all([tx.get(sRef), tx.get(tRef), tx.get(eRef)]);
     if (!stateSnap.exists() || !teamSnap.exists()) throw new AppError("NOT_LIVE");
 
     const state = stateSnap.data();
@@ -139,13 +181,40 @@ export async function placeBid(eventId, teamId, repUid) {
     if (state.status !== "live" || !state.currentPlayerId) {
       throw new AppError("NOT_LIVE");
     }
+    if (!state.biddingOpen) {
+      throw new AppError("BIDDING_NOT_OPEN");
+    }
     if (state.currentHighBidTeamId === teamId) {
       throw new AppError("ALREADY_HIGH_BIDDER");
+    }
+
+    // Two independent, optional caps -- see auctionQuota.js.
+    const currentPlayer = players.find((p) => p.id === state.currentPlayerId);
+    const roster = countTeamRoster(players, teamId);
+
+    if (currentPlayer) {
+      const genderTotals = computePoolGenderTotals(players);
+      const quota = computeGenderQuota(genderTotals[currentPlayer.gender] || 0, numTeams);
+      const teamGenderCount = currentPlayer.gender === "female" ? roster.female : roster.male;
+      if (isGenderCapped(currentPlayer.gender, teamGenderCount, quota.max)) {
+        throw new AppError("GENDER_QUOTA_FULL");
+      }
     }
 
     const proposedPrice = nextIncrement(state.currentPrice, state.incrementLadder);
     if (proposedPrice > team.purseRemaining) {
       throw new AppError("INSUFFICIENT_PURSE");
+    }
+
+    const totalSlotsPerTeam = computeTotalSlotsPerTeam(players.length, numTeams);
+    const bidCap = maxBidCapForTeam({
+      purseRemaining: team.purseRemaining,
+      totalSlotsPerTeam,
+      teamTotalOwned: roster.total,
+      reserveSlotPrice: eventSnap.data()?.reserveSlotPrice,
+    });
+    if (proposedPrice > bidCap) {
+      throw new AppError("EXCEEDS_RESERVE_CAP");
     }
 
     tx.update(sRef, {
@@ -206,6 +275,7 @@ export async function confirmSold(eventId, organizerUid) {
       currentPrice: 0,
       currentHighBidTeamId: null,
       currentHighBidderUid: null,
+      biddingOpen: false,
       blockDeadlineAt: null,
       undo,
       version: increment(1),
@@ -229,6 +299,7 @@ export async function markUnsold(eventId, organizerUid) {
       currentPrice: 0,
       currentHighBidTeamId: null,
       currentHighBidderUid: null,
+      biddingOpen: false,
       blockDeadlineAt: null,
       undo: { type: "unsold", playerId: state.currentPlayerId },
       version: increment(1),

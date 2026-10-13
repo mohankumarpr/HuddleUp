@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Alert,
@@ -31,6 +31,7 @@ import ShareIcon from "@mui/icons-material/Share";
 import { useAuth } from "../../context/AuthContext";
 import { subscribeToEvent, subscribeToSports } from "../../utils/firebase/events";
 import { requeueUnsoldPlayer } from "../../utils/firebase/players";
+import { completeSwapRequest, subscribeToSwapRequests } from "../../utils/firebase/swaps";
 import { partitionPoolForAuction } from "../../utils/marquee";
 import {
   DEFAULT_LADDER,
@@ -42,18 +43,21 @@ import {
   placeBid,
   revertLastAction,
   setAuctionStatus,
+  startBidding,
   startPlayerOnBlock,
   subscribeToBidsForPlayer,
   updateAuctionRules,
 } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { logActivity } from "../../utils/firebase/activityLog";
+import { playSwapSound } from "../../utils/sound";
 import { useAuctionRoom } from "./useAuctionRoom";
 import PlayerOnBlockDialog from "./PlayerOnBlockDialog";
 import AuctionStatsBar from "./AuctionStatsBar";
 import SoundToggleButton from "../common/SoundToggleButton";
 import TeamPurseList from "../common/TeamPurseList";
 import ShareSoldDialog from "../common/ShareSoldDialog";
+import SwapRequestsPanel from "../common/SwapRequestsPanel";
 import LoadingSpinner from "../LoadingSpinner";
 
 function AuctionRulesDialog({ open, ladder, bidTimerSeconds, onClose, onSave }) {
@@ -183,8 +187,34 @@ export default function OrganizerConsole() {
   const [busy, setBusy] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [shareCard, setShareCard] = useState(null);
+  const [swapRequests, setSwapRequests] = useState([]);
 
   useEffect(() => subscribeToEvent(eventId, setEvent), [eventId]);
+  useEffect(() => subscribeToSwapRequests(eventId, setSwapRequests), [eventId]);
+
+  // A chime the moment a swap offer arrives (or gets accepted and is ready to confirm) -- this can
+  // happen at any time, including while the full-screen on-the-block dialog covers the console, so
+  // a silent panel update alone could easily go unnoticed. Seeded silently on the first snapshot,
+  // same reasoning as the sold-confetti seeding in useAuctionRoom, so reopening the console after
+  // several swaps are already pending/accepted doesn't fire a barrage of chimes.
+  const swapSeenRef = useRef(null);
+  useEffect(() => {
+    const next = new Map(
+      swapRequests.filter((r) => r.status === "pending" || r.status === "accepted").map((r) => [r.id, r.status])
+    );
+    if (swapSeenRef.current === null) {
+      swapSeenRef.current = next;
+      return;
+    }
+    const prev = swapSeenRef.current;
+    let notify = false;
+    for (const [id, status] of next) {
+      const prevStatus = prev.get(id);
+      if (!prevStatus || (prevStatus === "pending" && status === "accepted")) notify = true;
+    }
+    if (notify && soundEnabled) playSwapSound();
+    swapSeenRef.current = next;
+  }, [swapRequests, soundEnabled]);
 
   useEffect(() => {
     getOrCreateAuctionState(eventId);
@@ -277,6 +307,17 @@ export default function OrganizerConsole() {
     });
   }
 
+  // Opens the block for bids -- a player going on the block and bidding actually opening are two
+  // separate organizer actions, so everyone has a moment to see who's up before the clock (if any)
+  // starts and the Bid buttons unlock.
+  function handleStartBidding() {
+    const playerName = currentPlayer?.name;
+    return run(async () => {
+      await startBidding(eventId, user.uid, state?.bidTimerSeconds);
+      logActivity(eventId, { actorUid: user.uid, action: "bidding_started", summary: `Opened bidding for ${playerName}` });
+    });
+  }
+
   // The organizer placing a bid "for" a team -- useful when a rep is bidding verbally/in person
   // and the organizer is entering it on their behalf, or a team has no rep logged in at all.
   // Reuses the same transactional placeBid the public bidder view uses, so the purse check and
@@ -313,6 +354,23 @@ export default function OrganizerConsole() {
     });
   }
 
+  const pendingSwaps = swapRequests.filter((r) => r.status === "pending");
+  const acceptedSwaps = swapRequests.filter((r) => r.status === "accepted");
+
+  function handleCompleteSwap(req) {
+    const player = players.find((p) => p.id === req.playerId);
+    const fromTeam = teams.find((t) => t.id === req.targetTeamId);
+    const toTeam = teams.find((t) => t.id === req.requesterTeamId);
+    return run(async () => {
+      await completeSwapRequest(eventId, req.id);
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "swap_completed",
+        summary: `Swapped ${player?.name || "a player"} from ${fromTeam?.name || "a team"} to ${toTeam?.name || "a team"} for ${req.price}`,
+      });
+    });
+  }
+
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
@@ -326,6 +384,12 @@ export default function OrganizerConsole() {
               <SettingsIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          {pendingSwaps.length + acceptedSwaps.length > 0 && (
+            <Chip
+              label={`${pendingSwaps.length + acceptedSwaps.length} swap request${pendingSwaps.length + acceptedSwaps.length === 1 ? "" : "s"}`}
+              color={acceptedSwaps.length > 0 ? "success" : "info"}
+            />
+          )}
           <Chip label={state?.status?.replace("_", " ") || "not started"} color={isLive ? "success" : "default"} />
         </Stack>
       </Stack>
@@ -418,8 +482,7 @@ export default function OrganizerConsole() {
                               startPlayerOnBlock(
                                 eventId,
                                 eligiblePoolPlayers[Math.floor(Math.random() * eligiblePoolPlayers.length)],
-                                user.uid,
-                                state?.bidTimerSeconds
+                                user.uid
                               )
                             )
                           }
@@ -448,7 +511,7 @@ export default function OrganizerConsole() {
                                   <Button
                                     size="small"
                                     disabled={busy || heldBack}
-                                    onClick={() => run(() => startPlayerOnBlock(eventId, player, user.uid, state?.bidTimerSeconds))}
+                                    onClick={() => run(() => startPlayerOnBlock(eventId, player, user.uid))}
                                   >
                                     Put on block
                                   </Button>
@@ -551,11 +614,27 @@ export default function OrganizerConsole() {
         </Grid>
       )}
 
+      {(acceptedSwaps.length > 0 || pendingSwaps.length > 0) && (
+        <>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+            Swap requests
+          </Typography>
+          <SwapRequestsPanel
+            swapRequests={swapRequests}
+            players={players}
+            teams={teams}
+            busy={busy}
+            onComplete={handleCompleteSwap}
+            sx={{ mb: 3 }}
+          />
+        </>
+      )}
+
       <Typography variant="subtitle1" fontWeight={600} gutterBottom>
         Teams
       </Typography>
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <TeamPurseList teams={teams} />
+        <TeamPurseList teams={teams} players={players} reserveSlotPrice={event?.reserveSlotPrice} />
       </Paper>
 
       <AuctionRulesDialog
@@ -584,6 +663,12 @@ export default function OrganizerConsole() {
         onBidForTeam={handleBidForTeam}
         onConfirmSold={handleConfirmSold}
         onMarkUnsold={handleMarkUnsold}
+        biddingOpen={Boolean(state?.biddingOpen)}
+        onStartBidding={handleStartBidding}
+        allPlayers={players}
+        swapRequests={swapRequests}
+        onCompleteSwap={handleCompleteSwap}
+        reserveSlotPrice={event?.reserveSlotPrice}
       />
 
       <ShareSoldDialog

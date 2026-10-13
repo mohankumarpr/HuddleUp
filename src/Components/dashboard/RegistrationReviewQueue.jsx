@@ -21,6 +21,8 @@ import { subscribeToSports } from "../../utils/firebase/events";
 import { subscribeToRegistrations } from "../../utils/firebase/registrations";
 import { promoteRegistrationToPlayer, rejectRegistrationRequest } from "../../utils/firebase/players";
 import { logActivity } from "../../utils/firebase/activityLog";
+import { genderMeta } from "../../utils/gender";
+import GenderBadge from "../common/GenderBadge";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -103,12 +105,20 @@ export default function RegistrationReviewQueue() {
         {registrations.map((registration) => (
           <Paper key={registration.id} variant="outlined" sx={{ p: 2 }}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Avatar src={registration.photoUrl} alt={registration.name} sx={{ width: 48, height: 48 }} />
+              <Avatar
+                src={registration.photoUrl}
+                alt={registration.name}
+                sx={{
+                  width: 48,
+                  height: 48,
+                  ...(genderMeta(registration.gender) && { border: `3px solid ${genderMeta(registration.gender).color}` }),
+                }}
+              />
               <Box sx={{ flexGrow: 1 }}>
-                <Typography fontWeight={600}>
-                  {registration.name}
-                  {registration.gender ? ` · ${registration.gender}` : ""}
-                </Typography>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography fontWeight={600}>{registration.name}</Typography>
+                  <GenderBadge gender={registration.gender} sx={{ height: 20, fontSize: 11 }} />
+                </Stack>
                 <Typography variant="body2" color="text.secondary">
                   {[registration.email, registration.contact, registration.block].filter(Boolean).join(" · ")}
                 </Typography>

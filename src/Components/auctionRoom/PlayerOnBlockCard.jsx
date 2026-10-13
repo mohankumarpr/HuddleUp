@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Avatar, Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import AddAlarmIcon from "@mui/icons-material/AddAlarm";
 import BidTimer from "./BidTimer";
+import GenderBadge from "../common/GenderBadge";
 
 export default function PlayerOnBlockCard({
   player,
@@ -13,6 +14,7 @@ export default function PlayerOnBlockCard({
   deadlineAt,
   timerSeconds,
   onExtendTimer,
+  biddingOpen = true,
 }) {
   if (!player) {
     return (
@@ -54,24 +56,24 @@ export default function PlayerOnBlockCard({
               <Typography variant="h4" fontWeight={700}>
                 {player.name}
               </Typography>
-              <Typography variant="body2" sx={{ color: "grey.400" }}>
-                {sportNames(player.sportIds) || "No sport"}
-                {basePrice != null && ` · Base ${basePrice}`}
-              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ justifyContent: { xs: "center", sm: "flex-start" } }}>
+                <Typography variant="body2" sx={{ color: "grey.400" }}>
+                  {sportNames(player.sportIds) || "No sport"}
+                  {basePrice != null && ` · Base ${basePrice}`}
+                </Typography>
+                <GenderBadge gender={player.gender} sx={{ fontSize: 12 }} />
+              </Stack>
               {player.aboutMe && (
                 <Box
                   sx={{
                     mt: 1,
-                    maxHeight: 140,
+                    maxHeight: 170,
                     overflowY: "auto",
                     textAlign: "left",
                     pr: 1,
                   }}
                 >
-                  <Typography
-                    variant="body2"
-                    sx={{ color: "grey.300", whiteSpace: "pre-line", lineHeight: 1.7 }}
-                  >
+                  <Typography sx={{ color: "grey.300", whiteSpace: "pre-line", lineHeight: 1.7, fontSize: 16 }}>
                     {player.aboutMe}
                   </Typography>
                 </Box>
@@ -104,7 +106,7 @@ export default function PlayerOnBlockCard({
                   sx={{ mt: 1, bgcolor: highBidTeam.color, color: "#fff", fontWeight: 700 }}
                 />
               ) : (
-                <Chip label="No bids yet" sx={{ mt: 1 }} variant="outlined" />
+                <Chip label={biddingOpen ? "No bids yet" : "Bidding not open yet"} sx={{ mt: 1 }} variant="outlined" />
               )}
             </Box>
           </Stack>

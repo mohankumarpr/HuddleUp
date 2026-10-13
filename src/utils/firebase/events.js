@@ -256,6 +256,7 @@ export async function createTeam(eventId, { name, owners, purseTotal, color }, c
     purseRemaining: purse,
     repUids: [],
     joinPin: randomDigits(4),
+    swapUsed: false,
     createdAt: serverTimestamp(),
   });
   return ref.id;

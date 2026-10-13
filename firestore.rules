@@ -214,6 +214,40 @@ service cloud.firestore {
         allow update, delete: if false; // append-only audit trail
       }
 
+      // A team-to-team "buy this player from you" offer. The requesting team's rep creates it; the
+      // target team's rep (the player's current owner) accepts or declines; the organizer alone
+      // finalizes an accepted offer (moves the player + purses), same trust boundary as every other
+      // purse-changing action in this app. Letting the organizer finalize -- rather than trusting the
+      // accepting rep's client to correctly update a team it doesn't belong to -- keeps all money
+      // movement behind the one write path that's already allowed to touch any team/player doc.
+      match /swapRequests/{requestId} {
+        allow read: if true;
+        allow create: if isOrgMember(eventId) ||
+          (
+            isTeamRepFor(eventId, request.resource.data.requesterTeamId) &&
+            request.resource.data.requesterTeamId != request.resource.data.targetTeamId &&
+            request.resource.data.status == 'pending' &&
+            request.resource.data.createdByUid == request.auth.uid &&
+            request.resource.data.price is number && request.resource.data.price >= 0
+          );
+        allow update: if isOrgMember(eventId) ||
+          // Target team accepts or declines an offer addressed to them.
+          (
+            isTeamRepFor(eventId, resource.data.targetTeamId) &&
+            resource.data.status == 'pending' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedByUid', 'respondedAt']) &&
+            (request.resource.data.status == 'accepted' || request.resource.data.status == 'declined')
+          ) ||
+          // Requester withdraws their own still-pending offer.
+          (
+            isTeamRepFor(eventId, resource.data.requesterTeamId) &&
+            resource.data.status == 'pending' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+            request.resource.data.status == 'cancelled'
+          );
+        allow delete: if isOrgMember(eventId);
+      }
+
       // Who did what, for the organizer to review after the fact. Organizer-only, append-only --
       // never shown to anyone outside the org, and never editable once written.
       match /activityLog/{entryId} {

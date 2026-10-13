@@ -18,6 +18,9 @@ const FRIENDLY_MESSAGES = {
   "auth/invalid-action-code": "This reset link is invalid or has already been used. Request a new one.",
   "auth/expired-action-code": "This reset link has expired. Request a new one.",
   NOT_LIVE: "The auction isn't live right now.",
+  BIDDING_NOT_OPEN: "The organizer hasn't started bidding for this player yet.",
+  GENDER_QUOTA_FULL: "Your team already has its maximum number of players of this gender.",
+  EXCEEDS_RESERVE_CAP: "That bid would leave too little purse to cover the reserve price for your remaining squad slots.",
   ALREADY_HIGH_BIDDER: "Your team already holds the highest bid.",
   INSUFFICIENT_PURSE: "Your remaining purse can't cover the next bid increment.",
   INVALID_JOIN_CODE: "That event code doesn't match any live event.",
@@ -32,6 +35,9 @@ const FRIENDLY_MESSAGES = {
   SAME_TEAM: "This player is already on that team.",
   TEAM_NOT_FOUND: "Couldn't find one of the teams involved.",
   TRANSFER_INSUFFICIENT_PURSE: "That team's remaining purse can't cover this player's price.",
+  SWAP_ALREADY_USED: "This team has already used its one swap for this auction.",
+  SWAP_NOT_ACCEPTED: "This swap hasn't been accepted by the other team yet.",
+  SWAP_PLAYER_NOT_AVAILABLE: "This player isn't available for that team to swap anymore -- they may have already been moved.",
 };
 
 export function friendlyErrorMessage(err) {

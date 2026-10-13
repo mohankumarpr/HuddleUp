@@ -41,6 +41,14 @@ export function playSoldSound() {
   tone(783.99, 0.2, 0.3); // G5
 }
 
+export function playSwapSound() {
+  // Two alternating notes -- distinct from the bid blip and the sold flourish -- for a swap offer
+  // arriving or getting accepted, so it's noticeable even while the organizer is absorbed in the
+  // full-screen block view and not looking at the swap requests panel.
+  tone(660, 0, 0.1);
+  tone(440, 0.12, 0.14);
+}
+
 const STORAGE_KEY = "auctionhub-sound-enabled";
 
 export function useSoundEnabled() {

@@ -108,6 +108,7 @@ export default function SpectatorView() {
           basePrice={room.currentPlayer ? room.state?.basePrice : null}
           deadlineAt={room.state?.blockDeadlineAt}
           timerSeconds={room.state?.bidTimerSeconds}
+          biddingOpen={Boolean(room.state?.biddingOpen)}
         />
 
         <Box sx={{ mt: 2 }}>

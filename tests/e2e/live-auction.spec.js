@@ -54,6 +54,9 @@ test("organizer runs an auction, a team rep bids, the sale is confirmed, and the
   await expect(page.getByText("On the block", { exact: true })).toBeVisible({ timeout: 15000 });
   await expect(page.getByRole("heading", { name: playerName })).toBeVisible();
 
+  // Bidding doesn't open just because a player is on the block -- the organizer has to open it.
+  await page.getByRole("button", { name: /^Start bidding$/i }).click();
+
   // Fetch the join link details for team A (join code + team id + PIN) from Firestore directly --
   // equivalent to what scanning that team's join QR code (see TeamManager) would hand a rep, and
   // avoids driving the plain MUI <Select> team picker, which has no accessible name of its own.

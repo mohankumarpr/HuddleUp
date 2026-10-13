@@ -17,6 +17,8 @@ const ACTION_LABELS = {
   player_requeued: "Unsold player returned to pool",
   organizer_bid_placed: "Organizer placed a bid for a team",
   player_edited: "Player details edited",
+  swap_completed: "Player swap completed",
+  bidding_started: "Bidding opened for a player",
   registration_approved: "Registration approved",
   registration_rejected: "Registration rejected",
   player_sold: "Player sold",
