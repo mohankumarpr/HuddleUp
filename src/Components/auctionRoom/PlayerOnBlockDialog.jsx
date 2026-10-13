@@ -189,6 +189,27 @@ export default function PlayerOnBlockDialog({
                   />
                 )}
               </Stack>
+
+              {/* Lives here (under the photo) rather than in the price panel -- this is otherwise
+                  empty space while bidding hasn't opened yet, and the price panel is already busy
+                  with the price/leading-team display right above where this used to sit. */}
+              {onStartBidding && !biddingOpen && (
+                <Box sx={{ textAlign: "center", mt: 4 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<GavelIcon />}
+                    disabled={busy}
+                    onClick={onStartBidding}
+                    sx={{ px: 4, py: 1.5, fontSize: 18 }}
+                  >
+                    Start bidding
+                  </Button>
+                  <Typography variant="body2" sx={{ mt: 1, color: "grey.400" }}>
+                    Teams can't bid until you open it.
+                  </Typography>
+                </Box>
+              )}
             </Box>
 
             {/* Price / description / bid history panel */}
@@ -254,24 +275,6 @@ export default function PlayerOnBlockDialog({
                   )}
                 </Box>
               </Stack>
-
-              {onStartBidding && !biddingOpen && (
-                <Box sx={{ textAlign: "center", mb: 3 }}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<GavelIcon />}
-                    disabled={busy}
-                    onClick={onStartBidding}
-                    sx={{ px: 4, py: 1.5, fontSize: 18 }}
-                  >
-                    Start bidding
-                  </Button>
-                  <Typography variant="body2" sx={{ mt: 1, color: "grey.400" }}>
-                    Teams can't bid until you open it.
-                  </Typography>
-                </Box>
-              )}
 
               {/* Description -- promoted up next to the price/leading team, since this is the other
                   thing the organizer (and the room) actually wants to see clearly while a player is
