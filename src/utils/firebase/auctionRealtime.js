@@ -313,6 +313,11 @@ export async function markUnsold(eventId, organizerUid) {
 // if a team paid for them, the purse is refunded. Only one level of undo is kept -- putting a new
 // player on the block (or undoing) clears it, so this can never unwind something from several
 // sales ago by accident.
+// Returns { reverted: boolean }. `reverted: false` means the undo buffer existed but no longer
+// matched reality -- the sale/unsold mark it refers to was since changed by something else (a
+// transfer, a manual "return to pool", a completed swap, or the player going back on the block),
+// and reverted anyway would either double-refund a team or clobber a different, later outcome.
+// Either way the stale buffer is cleared so a second click can't retry the same mistake.
 export async function revertLastAction(eventId, organizerUid) {
   const sRef = stateRef(eventId);
 
@@ -323,18 +328,28 @@ export async function revertLastAction(eventId, organizerUid) {
     if (!undo) throw new AppError("NOTHING_TO_UNDO");
 
     const playerRef = doc(db, "events", eventId, "players", undo.playerId);
+    const playerSnap = await tx.get(playerRef);
+    const player = playerSnap.exists() ? playerSnap.data() : null;
 
-    if (undo.type === "sold") {
-      const teamRef = doc(db, "events", eventId, "teams", undo.teamId);
-      const teamSnap = await tx.get(teamRef);
-      const team = teamSnap.data();
-      tx.update(teamRef, { purseRemaining: team.purseRemaining + undo.price });
-      tx.update(playerRef, { status: "pool", soldTeamId: null, soldPrice: null, soldAt: null });
-    } else {
-      tx.update(playerRef, { status: "pool" });
+    const stillValid =
+      undo.type === "sold"
+        ? Boolean(player && player.status === "sold" && player.soldTeamId === undo.teamId && player.soldPrice === undo.price)
+        : Boolean(player && player.status === "unsold");
+
+    if (stillValid) {
+      if (undo.type === "sold") {
+        const teamRef = doc(db, "events", eventId, "teams", undo.teamId);
+        const teamSnap = await tx.get(teamRef);
+        const team = teamSnap.data();
+        tx.update(teamRef, { purseRemaining: team.purseRemaining + undo.price });
+        tx.update(playerRef, { status: "pool", soldTeamId: null, soldPrice: null, soldAt: null });
+      } else {
+        tx.update(playerRef, { status: "pool" });
+      }
     }
 
     tx.update(sRef, { undo: null, updatedAt: serverTimestamp(), updatedBy: organizerUid });
+    return { reverted: stillValid };
   });
 }
 

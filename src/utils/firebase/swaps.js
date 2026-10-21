@@ -59,6 +59,7 @@ export async function cancelSwapRequest(eventId, requestId) {
 // re-checked, not trusted from a stale snapshot.
 export async function completeSwapRequest(eventId, requestId) {
   const requestRef = doc(db, "events", eventId, "swapRequests", requestId);
+  const auctionStateRef = doc(db, "events", eventId, "auction", "state");
 
   return runTransaction(db, async (tx) => {
     const requestSnap = await tx.get(requestRef);
@@ -71,10 +72,11 @@ export async function completeSwapRequest(eventId, requestId) {
     const requesterTeamRef = doc(db, "events", eventId, "teams", request.requesterTeamId);
     const targetTeamRef = doc(db, "events", eventId, "teams", request.targetTeamId);
 
-    const [playerSnap, requesterSnap, targetSnap] = await Promise.all([
+    const [playerSnap, requesterSnap, targetSnap, auctionStateSnap] = await Promise.all([
       tx.get(playerRef),
       tx.get(requesterTeamRef),
       tx.get(targetTeamRef),
+      tx.get(auctionStateRef),
     ]);
 
     if (!playerSnap.exists() || playerSnap.data().status !== "sold" || playerSnap.data().soldTeamId !== request.targetTeamId) {
@@ -95,5 +97,12 @@ export async function completeSwapRequest(eventId, requestId) {
     tx.update(requesterTeamRef, { purseRemaining: requesterTeam.purseRemaining - request.price, swapUsed: true });
     tx.update(targetTeamRef, { purseRemaining: targetSnap.data().purseRemaining + request.price });
     tx.update(requestRef, { status: "completed", completedAt: serverTimestamp() });
+
+    // Same reasoning as transferPlayer/returnPlayerToPool -- a pending "undo last sale" for this
+    // player would now refer to a team and price that no longer apply, and replaying it later
+    // would double-refund the old team.
+    if (auctionStateSnap.exists() && auctionStateSnap.data().undo?.playerId === request.playerId) {
+      tx.update(auctionStateRef, { undo: null });
+    }
   });
 }

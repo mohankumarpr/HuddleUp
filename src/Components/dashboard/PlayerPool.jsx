@@ -18,7 +18,15 @@ import {
   Pagination,
   Paper,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -35,6 +43,8 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import ShareIcon from "@mui/icons-material/Share";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import ViewModuleIcon from "@mui/icons-material/ViewModule";
+import TableRowsIcon from "@mui/icons-material/TableRows";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { genderMeta } from "../../utils/gender";
@@ -115,6 +125,22 @@ export default function PlayerPool() {
   const [event, setEvent] = useState(null);
   const [reservePriceDraft, setReservePriceDraft] = useState("");
   const [savingReservePrice, setSavingReservePrice] = useState(false);
+  // Remembered per browser (not per event) -- whichever view an organizer prefers, they almost
+  // certainly want it again next time, regardless of which event they're looking at.
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem("playerPoolViewMode") === "table" ? "table" : "card";
+    } catch {
+      return "card";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("playerPoolViewMode", viewMode);
+    } catch {
+      // Ignore -- the preference just won't persist across sessions.
+    }
+  }, [viewMode]);
   const statusFilter = searchParams.get("status") || "";
 
   function setStatusFilter(value) {
@@ -379,6 +405,24 @@ export default function PlayerPool() {
             </MenuItem>
           ))}
         </TextField>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={viewMode}
+          onChange={(_, next) => next && setViewMode(next)}
+          sx={{ flexShrink: 0 }}
+        >
+          <ToggleButton value="card" aria-label="Card view">
+            <Tooltip title="Card view">
+              <ViewModuleIcon fontSize="small" />
+            </Tooltip>
+          </ToggleButton>
+          <ToggleButton value="table" aria-label="Table view (shows every player on one screen)">
+            <Tooltip title="Table view -- shows every player on one screen">
+              <TableRowsIcon fontSize="small" />
+            </Tooltip>
+          </ToggleButton>
+        </ToggleButtonGroup>
       </Stack>
 
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center" sx={{ mb: 2 }}>
@@ -428,6 +472,149 @@ export default function PlayerPool() {
         </Paper>
       )}
 
+      {viewMode === "table" && visible.length > 0 && (
+        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: "75vh" }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell>Player</TableCell>
+                <TableCell>Gender</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Sport(s)</TableCell>
+                <TableCell align="right">Base price</TableCell>
+                <TableCell>Sold</TableCell>
+                <TableCell>Contact</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {visible.map((player) => {
+                const priv = privateById[player.id] || {};
+                const details = [priv.email, priv.contact, priv.block].filter(Boolean).join(" · ");
+                const hasHistory = player.status === "sold" || player.status === "unsold";
+                const removable = !["sold", "on_block"].includes(player.status);
+                return (
+                  <TableRow key={player.id} hover>
+                    <TableCell>
+                      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 180 }}>
+                        <Avatar
+                          src={player.photoUrl}
+                          alt={player.name}
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            fontSize: 14,
+                            ...(genderMeta(player.gender) && { border: `2px solid ${genderMeta(player.gender).color}` }),
+                          }}
+                        >
+                          {player.name?.[0]}
+                        </Avatar>
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
+                          {player.marquee && <StarIcon sx={{ fontSize: 15, color: "warning.main", flexShrink: 0 }} />}
+                          <Typography variant="body2" fontWeight={600} noWrap title={player.name}>
+                            {player.name}
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <GenderBadge gender={player.gender} sx={{ height: 20, fontSize: 11 }} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={player.status.replace("_", " ")} color={STATUS_COLOR[player.status]} size="small" />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 160 }} title={sportNames(player.sportIds)}>
+                        {sportNames(player.sportIds) || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">{player.basePrice}</TableCell>
+                    <TableCell>
+                      {player.status === "sold" && teamName(player.soldTeamId) ? (
+                        <Typography variant="body2" color="success.main" noWrap>
+                          {teamName(player.soldTeamId)} · {player.soldPrice}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          —
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block", maxWidth: 220 }} title={details}>
+                        {details || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" justifyContent="flex-end" spacing={0.25} flexWrap="nowrap">
+                        <Tooltip title={`Edit ${player.name}`}>
+                          <IconButton size="small" onClick={() => setEditTarget(player)} aria-label={`Edit ${player.name}`}>
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        {player.status === "pool" && (
+                          <Tooltip title={player.marquee ? `Unmark ${player.name} as marquee` : `Mark ${player.name} as a marquee player`}>
+                            <IconButton size="small" onClick={() => handleToggleMarquee(player)} aria-label={`Toggle marquee for ${player.name}`}>
+                              {player.marquee ? <StarIcon fontSize="small" sx={{ color: "warning.main" }} /> : <StarBorderIcon fontSize="small" />}
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {hasHistory && (
+                          <Tooltip title={`Bid history for ${player.name}`}>
+                            <IconButton size="small" onClick={() => setHistoryPlayer(player)} aria-label={`Show bid history for ${player.name}`}>
+                              <HistoryIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {player.status === "sold" && (
+                          <>
+                            <Tooltip title={`Share ${player.name}'s sale`}>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  const soldTeam = teams.find((t) => t.id === player.soldTeamId);
+                                  setShareCard({ player, teamName: soldTeam?.name || "Unknown team", teamColor: soldTeam?.color, price: player.soldPrice });
+                                }}
+                                aria-label={`Share ${player.name}'s sale`}
+                              >
+                                <ShareIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title={`Transfer ${player.name} to another team`}>
+                              <IconButton size="small" onClick={() => openTransfer(player)} aria-label={`Transfer ${player.name}`}>
+                                <SwapHorizIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title={`Return ${player.name} to the pool (refunds their team)`}>
+                              <IconButton size="small" onClick={() => handleReturnToPool(player)} aria-label={`Return ${player.name} to pool`}>
+                                <UndoIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
+                        <Tooltip title={removable ? `Remove ${player.name}` : "Sold or on-the-block players can't be removed"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!removable}
+                              onClick={() => handleDelete(player)}
+                              aria-label={`Remove ${player.name}`}
+                            >
+                              <DeleteOutlineIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {viewMode === "card" && (
       <Grid container spacing={2}>
         {paged.map((player) => {
           const priv = privateById[player.id] || {};
@@ -562,8 +749,9 @@ export default function PlayerPool() {
           );
         })}
       </Grid>
+      )}
 
-      {pageCount > 1 && (
+      {viewMode === "card" && pageCount > 1 && (
         <Stack alignItems="center" sx={{ mt: 3 }}>
           <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" />
         </Stack>

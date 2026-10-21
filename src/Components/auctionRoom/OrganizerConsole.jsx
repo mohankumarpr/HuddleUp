@@ -420,8 +420,14 @@ export default function OrganizerConsole() {
                     ? `Undid sale of ${undoPlayerName || "a player"} to ${undoTeamName || "a team"}`
                     : `Undid unsold mark on ${undoPlayerName || "a player"}`;
                 run(async () => {
-                  await revertLastAction(eventId, user.uid);
-                  logActivity(eventId, { actorUid: user.uid, action: "action_undone", summary });
+                  const { reverted } = await revertLastAction(eventId, user.uid);
+                  if (reverted) {
+                    logActivity(eventId, { actorUid: user.uid, action: "action_undone", summary });
+                  } else {
+                    setError(
+                      "That player has already been moved, transferred, or swapped since then, so this undo no longer applies. Nothing was changed."
+                    );
+                  }
                 });
               }}
             >

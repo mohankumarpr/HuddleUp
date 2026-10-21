@@ -126,9 +126,10 @@ export async function deletePlayer(eventId, playerId) {
 export async function transferPlayer(eventId, playerId, toTeamId) {
   const playerRef = doc(db, "events", eventId, "players", playerId);
   const toTeamRef = doc(db, "events", eventId, "teams", toTeamId);
+  const auctionStateRef = doc(db, "events", eventId, "auction", "state");
 
   return runTransaction(db, async (tx) => {
-    const playerSnap = await tx.get(playerRef);
+    const [playerSnap, auctionStateSnap] = await Promise.all([tx.get(playerRef), tx.get(auctionStateRef)]);
     if (!playerSnap.exists() || playerSnap.data().status !== "sold") {
       throw new AppError("PLAYER_NOT_SOLD");
     }
@@ -152,6 +153,13 @@ export async function transferPlayer(eventId, playerId, toTeamId) {
     tx.update(fromTeamRef, { purseRemaining: fromTeamSnap.data().purseRemaining + price });
     tx.update(toTeamRef, { purseRemaining: toTeam.purseRemaining - price });
     tx.update(playerRef, { soldTeamId: toTeamId });
+
+    // A pending "undo last sale" for this same player is now stale -- it refers to a team this
+    // player no longer belongs to, and replaying it later would double-refund that team. Clearing
+    // it here means the console never even offers an undo that can't safely apply.
+    if (auctionStateSnap.exists() && auctionStateSnap.data().undo?.playerId === playerId) {
+      tx.update(auctionStateRef, { undo: null });
+    }
   });
 }
 
@@ -160,9 +168,10 @@ export async function transferPlayer(eventId, playerId, toTeamId) {
 // not just the most recent sale.
 export async function returnPlayerToPool(eventId, playerId) {
   const playerRef = doc(db, "events", eventId, "players", playerId);
+  const auctionStateRef = doc(db, "events", eventId, "auction", "state");
 
   return runTransaction(db, async (tx) => {
-    const playerSnap = await tx.get(playerRef);
+    const [playerSnap, auctionStateSnap] = await Promise.all([tx.get(playerRef), tx.get(auctionStateRef)]);
     if (!playerSnap.exists() || playerSnap.data().status !== "sold") {
       throw new AppError("PLAYER_NOT_SOLD");
     }
@@ -173,5 +182,10 @@ export async function returnPlayerToPool(eventId, playerId) {
       tx.update(teamRef, { purseRemaining: teamSnap.data().purseRemaining + (player.soldPrice || 0) });
     }
     tx.update(playerRef, { status: "pool", soldTeamId: null, soldPrice: null, soldAt: null });
+
+    // Same reasoning as transferPlayer -- a pending undo for this player would now be stale.
+    if (auctionStateSnap.exists() && auctionStateSnap.data().undo?.playerId === playerId) {
+      tx.update(auctionStateRef, { undo: null });
+    }
   });
 }
