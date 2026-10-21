@@ -68,6 +68,7 @@ import { buildResultsCsv } from "../../utils/resultsExport";
 import BidHistoryList from "../common/BidHistoryList";
 import ShareSoldDialog from "../common/ShareSoldDialog";
 import EditPlayerDialog from "./EditPlayerDialog";
+import PlayerDetailDialog from "./PlayerDetailDialog";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -122,6 +123,7 @@ export default function PlayerPool() {
   const [marqueeOnly, setMarqueeOnly] = useState(false);
   const [shareCard, setShareCard] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
   const [event, setEvent] = useState(null);
   const [reservePriceDraft, setReservePriceDraft] = useState("");
   const [savingReservePrice, setSavingReservePrice] = useState(false);
@@ -477,6 +479,7 @@ export default function PlayerPool() {
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
+                <TableCell sx={{ width: 48 }}>#</TableCell>
                 <TableCell>Player</TableCell>
                 <TableCell>Gender</TableCell>
                 <TableCell>Status</TableCell>
@@ -488,13 +491,14 @@ export default function PlayerPool() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {visible.map((player) => {
+              {visible.map((player, index) => {
                 const priv = privateById[player.id] || {};
                 const details = [priv.email, priv.contact, priv.block].filter(Boolean).join(" · ");
                 const hasHistory = player.status === "sold" || player.status === "unsold";
                 const removable = !["sold", "on_block"].includes(player.status);
                 return (
-                  <TableRow key={player.id} hover>
+                  <TableRow key={player.id} hover onClick={() => setDetailTarget(player)} sx={{ cursor: "pointer" }}>
+                    <TableCell sx={{ color: "text.secondary" }}>{index + 1}</TableCell>
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 180 }}>
                         <Avatar
@@ -545,7 +549,7 @@ export default function PlayerPool() {
                         {details || "—"}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                       <Stack direction="row" justifyContent="flex-end" spacing={0.25} flexWrap="nowrap">
                         <Tooltip title={`Edit ${player.name}`}>
                           <IconButton size="small" onClick={() => setEditTarget(player)} aria-label={`Edit ${player.name}`}>
@@ -623,7 +627,11 @@ export default function PlayerPool() {
           const removable = !["sold", "on_block"].includes(player.status);
           return (
             <Grid item xs={12} sm={6} md={4} lg={3} key={player.id}>
-              <Paper variant="outlined" sx={{ p: 2, height: "100%", display: "flex", flexDirection: "column" }}>
+              <Paper
+                variant="outlined"
+                onClick={() => setDetailTarget(player)}
+                sx={{ p: 2, height: "100%", display: "flex", flexDirection: "column", cursor: "pointer", "&:hover": { borderColor: "primary.main" } }}
+              >
                 <Stack direction="row" alignItems="flex-start" spacing={1.5}>
                   <Avatar
                     src={player.photoUrl}
@@ -685,7 +693,13 @@ export default function PlayerPool() {
                   )}
                 </Box>
 
-                <Stack direction="row" justifyContent="flex-end" spacing={0.5} sx={{ mt: 1.5, pt: 1, borderTop: 1, borderColor: "divider" }}>
+                <Stack
+                  direction="row"
+                  justifyContent="flex-end"
+                  spacing={0.5}
+                  onClick={(e) => e.stopPropagation()}
+                  sx={{ mt: 1.5, pt: 1, borderTop: 1, borderColor: "divider" }}
+                >
                   <Tooltip title={`Edit ${player.name}`}>
                     <IconButton size="small" onClick={() => setEditTarget(player)} aria-label={`Edit ${player.name}`}>
                       <EditOutlinedIcon fontSize="small" />
@@ -822,6 +836,14 @@ export default function PlayerPool() {
         sports={sports}
         onClose={() => setEditTarget(null)}
         onSave={handleEditSave}
+      />
+
+      <PlayerDetailDialog
+        player={detailTarget}
+        privateInfo={privateById[detailTarget?.id]}
+        sportNames={sportNames(detailTarget?.sportIds)}
+        teams={teams}
+        onClose={() => setDetailTarget(null)}
       />
     </Box>
   );
