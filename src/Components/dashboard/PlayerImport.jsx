@@ -39,7 +39,7 @@ export default function PlayerImport() {
 
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState(null); // { rows, headers }
-  const [defaultBasePrice, setDefaultBasePrice] = useState(100);
+  const [defaultBasePrice, setDefaultBasePrice] = useState(5000000);
   const [createMissingSports, setCreateMissingSports] = useState(false);
   const [progress, setProgress] = useState(null); // { done, total }
   const [result, setResult] = useState(null);

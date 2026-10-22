@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Chip, LinearProgress, Stack, Typography } from "@mui/material";
 import { computeGenderQuota, computePoolGenderTotals, computeTotalSlotsPerTeam, countTeamRoster, maxBidCapForTeam } from "../../utils/auctionQuota";
+import { formatAmount } from "../../utils/formatAmount";
 
 // Every team's purse, side by side -- used wherever "what have the other teams got left" matters:
 // the team bidder view (so a rep can see rivals' budgets, not just their own), the spectator
@@ -61,7 +62,7 @@ export default function TeamPurseList({ teams, highlightTeamId, dark = false, pl
                 )}
               </Stack>
               <Typography variant="caption" sx={{ color: dark ? "grey.400" : "text.secondary", flexShrink: 0 }}>
-                {team.purseRemaining} / {team.purseTotal}
+                {formatAmount(team.purseRemaining)} / {formatAmount(team.purseTotal)}
               </Typography>
             </Stack>
             <LinearProgress
@@ -80,7 +81,7 @@ export default function TeamPurseList({ teams, highlightTeamId, dark = false, pl
                 {bidCap != null && (
                   <Chip
                     size="small"
-                    label={`Max bid: ${bidCap}`}
+                    label={`Max bid: ${formatAmount(bidCap)}`}
                     sx={{
                       height: 18,
                       fontSize: 10,

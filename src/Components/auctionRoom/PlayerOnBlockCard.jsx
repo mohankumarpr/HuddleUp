@@ -4,6 +4,7 @@ import { Avatar, Box, Button, Chip, Paper, Stack, Typography } from "@mui/materi
 import AddAlarmIcon from "@mui/icons-material/AddAlarm";
 import BidTimer from "./BidTimer";
 import GenderBadge from "../common/GenderBadge";
+import { formatAmount } from "../../utils/formatAmount";
 
 export default function PlayerOnBlockCard({
   player,
@@ -59,7 +60,7 @@ export default function PlayerOnBlockCard({
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ justifyContent: { xs: "center", sm: "flex-start" } }}>
                 <Typography variant="body2" sx={{ color: "grey.400" }}>
                   {sportNames(player.sportIds) || "No sport"}
-                  {basePrice != null && ` · Base ${basePrice}`}
+                  {basePrice != null && ` · Base ${formatAmount(basePrice)}`}
                 </Typography>
                 <GenderBadge gender={player.gender} sx={{ fontSize: 12 }} />
               </Stack>
@@ -97,7 +98,7 @@ export default function PlayerOnBlockCard({
             <Box sx={{ textAlign: "center" }}>
               <motion.div key={currentPrice} initial={{ scale: 1.15 }} animate={{ scale: 1 }} transition={{ duration: 0.25 }}>
                 <Typography variant="h3" fontWeight={800}>
-                  {currentPrice}
+                  {formatAmount(currentPrice)}
                 </Typography>
               </motion.div>
               {highBidTeam ? (

@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Chip, List, ListItem, ListItemText, Stack, Typography } from "@mui/material";
+import { formatAmount } from "../../utils/formatAmount";
 
 function timeAgo(placedAt) {
   const ms = placedAt?.toMillis ? placedAt.toMillis() : null;
@@ -70,7 +71,7 @@ export default function BidHistoryList({ bids, teams, dense = false, emptyText =
             />
             <Chip
               size="small"
-              label={bid.amount}
+              label={formatAmount(bid.amount)}
               sx={
                 isTop
                   ? { bgcolor: "success.main", color: "#fff", fontWeight: 700 }

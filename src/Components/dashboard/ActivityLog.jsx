@@ -26,6 +26,7 @@ const ACTION_LABELS = {
   action_undone: "Action undone",
   standings_published: "Standings published",
   fixtures_cleared: "Fixtures cleared",
+  players_base_price_bulk_set: "Base price set for all players",
 };
 
 function formatWhen(createdAt) {

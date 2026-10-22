@@ -1,6 +1,7 @@
 import React from "react";
 import { Avatar, Box, Typography } from "@mui/material";
 import { APP_NAME } from "../../branding";
+import { formatAmount } from "../../utils/formatAmount";
 
 // A fixed-size, self-contained visual card meant to be captured as an image (see
 // ShareSoldDialog.jsx) and shared outside the app -- a WhatsApp-group-friendly "SOLD!" announcement
@@ -76,7 +77,7 @@ const SoldShareCard = React.forwardRef(function SoldShareCard({ player, teamName
         <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{teamName}</Typography>
       </Box>
 
-      <Typography sx={{ fontSize: 44, fontWeight: 900, lineHeight: 1 }}>{price}</Typography>
+      <Typography sx={{ fontSize: 44, fontWeight: 900, lineHeight: 1 }}>{formatAmount(price)}</Typography>
 
       <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.55)", mt: 5, letterSpacing: 1 }}>
         {eventName ? `${eventName} · ` : ""}

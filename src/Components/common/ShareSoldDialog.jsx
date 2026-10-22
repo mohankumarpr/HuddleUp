@@ -4,6 +4,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DownloadIcon from "@mui/icons-material/Download";
 import ShareIcon from "@mui/icons-material/Share";
 import SoldShareCard from "./SoldShareCard";
+import { formatAmount } from "../../utils/formatAmount";
 
 const canUseWebShare = typeof navigator !== "undefined" && typeof navigator.share === "function" && typeof navigator.canShare === "function";
 
@@ -54,7 +55,7 @@ export default function ShareSoldDialog({ open, onClose, player, teamName, teamC
       const blob = await captureBlob();
       const file = new File([blob], fileNameFor(player), { type: "image/png" });
       if (!navigator.canShare({ files: [file] })) throw new Error("Sharing images isn't supported on this device.");
-      await navigator.share({ files: [file], title: "Sold!", text: `${player?.name} sold to ${teamName} for ${price}` });
+      await navigator.share({ files: [file], title: "Sold!", text: `${player?.name} sold to ${teamName} for ${formatAmount(price)}` });
     } catch (err) {
       // A user cancelling the native share sheet also lands here (AbortError) -- not a real error.
       if (err?.name !== "AbortError") setError(err.message || "Couldn't share the image.");

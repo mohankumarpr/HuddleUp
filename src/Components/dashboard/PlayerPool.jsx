@@ -52,6 +52,7 @@ import GenderBadge from "../common/GenderBadge";
 import { computeGenderQuota, computePoolGenderTotals, computeTotalSlotsPerTeam } from "../../utils/auctionQuota";
 import { subscribeToEvent, subscribeToSports, subscribeToTeams, updateEvent } from "../../utils/firebase/events";
 import {
+  bulkSetBasePrice,
   deletePlayer,
   returnPlayerToPool,
   subscribeToPlayerPrivate,
@@ -60,6 +61,7 @@ import {
   updatePlayer,
   updatePlayerPrivate,
 } from "../../utils/firebase/players";
+import { formatAmount } from "../../utils/formatAmount";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { logActivity } from "../../utils/firebase/activityLog";
@@ -127,6 +129,9 @@ export default function PlayerPool() {
   const [event, setEvent] = useState(null);
   const [reservePriceDraft, setReservePriceDraft] = useState("");
   const [savingReservePrice, setSavingReservePrice] = useState(false);
+  const [basePriceDraft, setBasePriceDraft] = useState(5000000);
+  const [settingBasePrice, setSettingBasePrice] = useState(false);
+  const [basePriceError, setBasePriceError] = useState(null);
   // Remembered per browser (not per event) -- whichever view an organizer prefers, they almost
   // certainly want it again next time, regardless of which event they're looking at.
   const [viewMode, setViewMode] = useState(() => {
@@ -161,6 +166,31 @@ export default function PlayerPool() {
       await updateEvent(eventId, { reserveSlotPrice: Math.max(0, Number(reservePriceDraft) || 0) });
     } finally {
       setSavingReservePrice(false);
+    }
+  }
+
+  async function handleBulkSetBasePrice() {
+    const price = Math.max(0, Number(basePriceDraft) || 0);
+    const ok = await confirm({
+      title: `Set base price to ${formatAmount(price)} for all ${players.length} players?`,
+      description: "This overwrites every player's base price in this event, including already-sold ones. It can't be undone automatically -- you'd need to edit players back one at a time.",
+      confirmLabel: "Set for all players",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBasePriceError(null);
+    setSettingBasePrice(true);
+    try {
+      await bulkSetBasePrice(eventId, players, price);
+      logActivity(eventId, {
+        actorUid: user.uid,
+        action: "players_base_price_bulk_set",
+        summary: `Set base price to ${formatAmount(price)} for all ${players.length} players`,
+      });
+    } catch (err) {
+      setBasePriceError(friendlyErrorMessage(err));
+    } finally {
+      setSettingBasePrice(false);
     }
   }
 
@@ -262,7 +292,7 @@ export default function PlayerPool() {
       logActivity(eventId, {
         actorUid: user.uid,
         action: "player_transferred",
-        summary: `Transferred ${transferTarget.name} to ${toTeam?.name || "another team"} for ${transferTarget.soldPrice}`,
+        summary: `Transferred ${transferTarget.name} to ${toTeam?.name || "another team"} for ${formatAmount(transferTarget.soldPrice)}`,
       });
       setTransferTarget(null);
     } catch (err) {
@@ -275,7 +305,7 @@ export default function PlayerPool() {
   async function handleReturnToPool(player) {
     const ok = await confirm({
       title: `Return ${player.name} to the pool?`,
-      description: `${teamName(player.soldTeamId) || "Their team"} will be refunded ${player.soldPrice}, and ${player.name} becomes available to put on the block again.`,
+      description: `${teamName(player.soldTeamId) || "Their team"} will be refunded ${formatAmount(player.soldPrice)}, and ${player.name} becomes available to put on the block again.`,
       confirmLabel: "Return to pool",
       destructive: true,
     });
@@ -286,7 +316,7 @@ export default function PlayerPool() {
       logActivity(eventId, {
         actorUid: user.uid,
         action: "player_returned_to_pool",
-        summary: `Returned ${player.name} to the pool (refunded ${player.soldPrice} to ${teamName(player.soldTeamId) || "their team"})`,
+        summary: `Returned ${player.name} to the pool (refunded ${formatAmount(player.soldPrice)} to ${teamName(player.soldTeamId) || "their team"})`,
       });
     } catch (err) {
       setDeleteError(friendlyErrorMessage(err));
@@ -378,6 +408,36 @@ export default function PlayerPool() {
               <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 480 }}>
                 Caps how much a team can bid, so it never leaves them unable to afford this amount for
                 every roster slot still left to fill. Leave at 0 to turn this off.
+              </Typography>
+            </Stack>
+
+            {basePriceError && (
+              <Alert severity="error" sx={{ mt: 2 }} onClose={() => setBasePriceError(null)}>
+                {basePriceError}
+              </Alert>
+            )}
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} sx={{ mt: 2 }}>
+              <TextField
+                size="small"
+                label="Base price for every player"
+                type="number"
+                value={basePriceDraft}
+                onChange={(e) => setBasePriceDraft(e.target.value)}
+                helperText={formatAmount(Number(basePriceDraft) || 0)}
+                sx={{ maxWidth: 280 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                color="warning"
+                disabled={settingBasePrice || !players.length}
+                onClick={handleBulkSetBasePrice}
+              >
+                {settingBasePrice ? "Setting..." : "Set for all players"}
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 480 }}>
+                Overwrites every player's base price at once -- handy for starting a fresh auction where
+                everyone opens at the same amount.
               </Typography>
             </Stack>
           </Paper>
@@ -532,11 +592,11 @@ export default function PlayerPool() {
                         {sportNames(player.sportIds) || "—"}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">{player.basePrice}</TableCell>
+                    <TableCell align="right">{formatAmount(player.basePrice)}</TableCell>
                     <TableCell>
                       {player.status === "sold" && teamName(player.soldTeamId) ? (
                         <Typography variant="body2" color="success.main" noWrap>
-                          {teamName(player.soldTeamId)} · {player.soldPrice}
+                          {teamName(player.soldTeamId)} · {formatAmount(player.soldPrice)}
                         </Typography>
                       ) : (
                         <Typography variant="body2" color="text.secondary">
@@ -661,11 +721,11 @@ export default function PlayerPool() {
                     {sportNames(player.sportIds) || "No sports"}
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Base price <b>{player.basePrice}</b>
+                    Base price <b>{formatAmount(player.basePrice)}</b>
                   </Typography>
                   {player.status === "sold" && teamName(player.soldTeamId) && (
                     <Typography variant="body2" color="success.main" sx={{ mt: 0.5 }}>
-                      Sold to {teamName(player.soldTeamId)} for {player.soldPrice}
+                      Sold to {teamName(player.soldTeamId)} for {formatAmount(player.soldPrice)}
                     </Typography>
                   )}
                   {player.aboutMe && (
@@ -788,7 +848,7 @@ export default function PlayerPool() {
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Moves {transferTarget?.name} from {teamName(transferTarget?.soldTeamId) || "their current team"} to the team
-            below at the same price ({transferTarget?.soldPrice}) -- the current team is refunded, the new team is charged.
+            below at the same price ({formatAmount(transferTarget?.soldPrice)}) -- the current team is refunded, the new team is charged.
           </Typography>
           {transferError && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -806,7 +866,7 @@ export default function PlayerPool() {
               .filter((t) => t.id !== transferTarget?.soldTeamId)
               .map((t) => (
                 <MenuItem key={t.id} value={t.id}>
-                  {t.name} (purse {t.purseRemaining})
+                  {t.name} (purse {formatAmount(t.purseRemaining)})
                 </MenuItem>
               ))}
           </TextField>

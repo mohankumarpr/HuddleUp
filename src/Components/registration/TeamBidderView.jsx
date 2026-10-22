@@ -42,6 +42,7 @@ import {
   subscribeToSwapRequests,
 } from "../../utils/firebase/swaps";
 import { playSwapSound } from "../../utils/sound";
+import { formatAmount } from "../../utils/formatAmount";
 import {
   computeGenderQuota,
   computePoolGenderTotals,
@@ -129,7 +130,7 @@ function SwapRequestDialog({ open, onClose, myTeam, teams, otherTeamPlayers, onS
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             fullWidth
-            helperText={myTeam ? `Your remaining purse: ${myTeam.purseRemaining}` : undefined}
+            helperText={myTeam ? `Your remaining purse: ${formatAmount(myTeam.purseRemaining)}` : undefined}
           />
           {priceNum > 0 && !canAfford && <Alert severity="warning">Your remaining purse can't cover this offer.</Alert>}
         </Stack>
@@ -392,19 +393,19 @@ export default function TeamBidderView() {
               <Typography variant="caption" color="text.secondary">
                 Spent
               </Typography>
-              <Typography variant="h6">{mySpent}</Typography>
+              <Typography variant="h6">{formatAmount(mySpent)}</Typography>
             </Box>
             <Box sx={{ flexGrow: 1 }}>
               <Typography variant="caption" color="text.secondary">
                 Remaining
               </Typography>
-              <Typography variant="h6">{myTeam.purseRemaining}</Typography>
+              <Typography variant="h6">{formatAmount(myTeam.purseRemaining)}</Typography>
             </Box>
             <Box sx={{ flexGrow: 1 }}>
               <Typography variant="caption" color="text.secondary">
                 Total purse
               </Typography>
-              <Typography variant="h6">{myTeam.purseTotal}</Typography>
+              <Typography variant="h6">{formatAmount(myTeam.purseTotal)}</Typography>
             </Box>
           </Stack>
           <LinearProgress
@@ -424,7 +425,7 @@ export default function TeamBidderView() {
                 size="small"
                 color={myBidCap < myTeam.purseRemaining ? "warning" : "default"}
                 variant="outlined"
-                label={`Max safe bid: ${Number.isFinite(myBidCap) ? myBidCap : myTeam.purseRemaining}`}
+                label={`Max safe bid: ${formatAmount(Number.isFinite(myBidCap) ? myBidCap : myTeam.purseRemaining)}`}
               />
             )}
             {genderTotals.female > 0 && (
@@ -465,7 +466,7 @@ export default function TeamBidderView() {
                     <ListItemAvatar>
                       <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
                     </ListItemAvatar>
-                    <ListItemText primary={p.name} secondary={`Bought for ${p.soldPrice}`} />
+                    <ListItemText primary={p.name} secondary={`Bought for ${formatAmount(p.soldPrice)}`} />
                   </ListItem>
                 ))}
               </List>
@@ -520,8 +521,8 @@ export default function TeamBidderView() {
                   }
                 >
                   {myOutgoingSwap.status === "accepted"
-                    ? `${targetTeam?.name || "They"} agreed to your offer of ${myOutgoingSwap.price} for ${player?.name || "that player"} -- waiting for the organizer to confirm it.`
-                    : `Waiting for ${targetTeam?.name || "the other team"} to respond to your offer of ${myOutgoingSwap.price} for ${player?.name || "that player"}.`}
+                    ? `${targetTeam?.name || "They"} agreed to your offer of ${formatAmount(myOutgoingSwap.price)} for ${player?.name || "that player"} -- waiting for the organizer to confirm it.`
+                    : `Waiting for ${targetTeam?.name || "the other team"} to respond to your offer of ${formatAmount(myOutgoingSwap.price)} for ${player?.name || "that player"}.`}
                 </Alert>
               );
             })()}
@@ -556,7 +557,7 @@ export default function TeamBidderView() {
                 }
               >
                 {fromTeam?.name || "Another team"} wants to buy {player?.name || "this player"} from you for{" "}
-                {req.price}.
+                {formatAmount(req.price)}.
               </Alert>
             );
           })}
@@ -621,7 +622,7 @@ export default function TeamBidderView() {
             ? "Insufficient purse"
             : !withinReserveCap
             ? "Over your reserve-safe limit"
-            : `Bid ${proposedPrice}`}
+            : `Bid ${formatAmount(proposedPrice)}`}
         </Button>
       </motion.div>
 
@@ -681,7 +682,7 @@ export default function TeamBidderView() {
                   </ListItemAvatar>
                   <ListItemText
                     primary={p.name}
-                    secondary={`${room.teams.find((t) => t.id === p.soldTeamId)?.name || "Unknown team"} · ${p.soldPrice}`}
+                    secondary={`${room.teams.find((t) => t.id === p.soldTeamId)?.name || "Unknown team"} · ${formatAmount(p.soldPrice)}`}
                   />
                 </ListItem>
               ))}
@@ -711,7 +712,7 @@ export default function TeamBidderView() {
                   <ListItemAvatar>
                     <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
                   </ListItemAvatar>
-                  <ListItemText primary={p.name} secondary={`Base price ${p.basePrice}`} />
+                  <ListItemText primary={p.name} secondary={`Base price ${formatAmount(p.basePrice)}`} />
                 </ListItem>
               ))}
             </List>

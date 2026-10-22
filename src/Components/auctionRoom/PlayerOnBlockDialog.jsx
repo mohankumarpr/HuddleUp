@@ -31,6 +31,7 @@ import {
   isGenderCapped,
   maxBidCapForTeam,
 } from "../../utils/auctionQuota";
+import { formatAmount } from "../../utils/formatAmount";
 
 // The whole "player on the block" experience as a full-screen takeover -- it can only be closed by
 // resolving the player (sold or unsold), never by a backdrop click or Escape, so the organizer
@@ -188,7 +189,7 @@ export default function PlayerOnBlockDialog({
                 {basePrice != null && (
                   <Chip
                     size="small"
-                    label={`Base ${basePrice}`}
+                    label={`Base ${formatAmount(basePrice)}`}
                     variant="outlined"
                     sx={{ color: "grey.300", borderColor: "rgba(255,255,255,0.3)", fontSize: 12 }}
                   />
@@ -263,7 +264,7 @@ export default function PlayerOnBlockDialog({
                 <Box sx={{ textAlign: "center" }}>
                   <motion.div key={currentPrice} initial={{ scale: 1.2 }} animate={{ scale: 1 }} transition={{ duration: 0.25 }}>
                     <Typography fontWeight={800} sx={{ fontSize: { xs: 56, sm: 72, md: 88 }, lineHeight: 1 }}>
-                      {currentPrice}
+                      {formatAmount(currentPrice)}
                     </Typography>
                   </motion.div>
                   {highBidTeam ? (
@@ -350,8 +351,8 @@ export default function PlayerOnBlockDialog({
                         });
                         return (
                           <MenuItem key={t.id} value={t.id} disabled={capped}>
-                            {t.name} (purse {t.purseRemaining}
-                            {Number.isFinite(cap) ? `, max bid ${cap}` : ""}){capped ? " -- gender quota full" : ""}
+                            {t.name} (purse {formatAmount(t.purseRemaining)}
+                            {Number.isFinite(cap) ? `, max bid ${formatAmount(cap)}` : ""}){capped ? " -- gender quota full" : ""}
                           </MenuItem>
                         );
                       })}
@@ -365,7 +366,7 @@ export default function PlayerOnBlockDialog({
                         setProxyTeamId("");
                       }}
                     >
-                      Bid {nextBidAmount}
+                      Bid {formatAmount(nextBidAmount)}
                     </Button>
                   </Stack>
                   {proxyTeamId && !proxyCanAfford && (

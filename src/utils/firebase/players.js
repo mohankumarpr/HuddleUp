@@ -102,6 +102,24 @@ export async function updatePlayerPrivate(eventId, playerId, patch) {
   await setDoc(doc(db, "events", eventId, "playerPrivate", playerId), patch, { merge: true });
 }
 
+// Organizer convenience for normalizing every player to one starting price at once (e.g. "everyone
+// starts at 50 lakhs") instead of editing each player individually. Doesn't touch sold/soldPrice --
+// basePrice is just the opening price a player's auction started at, so rewriting it after the fact
+// is harmless even for already-sold players. Batched in chunks of 450 to stay under Firestore's
+// 500-write-per-batch limit for very large player pools.
+export async function bulkSetBasePrice(eventId, players, basePrice) {
+  const price = Math.max(0, Number(basePrice) || 0);
+  const chunkSize = 450;
+  for (let i = 0; i < players.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    for (const player of players.slice(i, i + chunkSize)) {
+      batch.update(doc(db, "events", eventId, "players", player.id), { basePrice: price });
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await batch.commit();
+  }
+}
+
 // Refuses to remove a player who's sold (their team's purse deduction would have nothing to point
 // at) or currently on the block (the live auction state still references them). Anything else --
 // pool or unsold -- is safe to remove outright, no soft-delete/undo: re-adding a player (manually

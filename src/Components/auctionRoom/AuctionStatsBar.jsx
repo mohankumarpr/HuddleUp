@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Stack, Typography } from "@mui/material";
+import { formatAmount } from "../../utils/formatAmount";
 
 function Stat({ label, value, color, dark }) {
   return (
@@ -37,9 +38,9 @@ export default function AuctionStatsBar({ stats, dark = false }) {
       <Stat label="Sold" value={stats.soldCount} color="#10B981" dark={dark} />
       <Stat label="Unsold" value={stats.unsoldCount} color="#EF4444" dark={dark} />
       <Stat label="In pool" value={stats.poolCount} dark={dark} />
-      <Stat label="Total spent" value={stats.totalSpent} dark={dark} />
-      <Stat label="Avg sale" value={stats.avgSale} dark={dark} />
-      {stats.highest && <Stat label={`Top: ${stats.highest.name}`} value={stats.highest.price} color="#F59E0B" dark={dark} />}
+      <Stat label="Total spent" value={formatAmount(stats.totalSpent)} dark={dark} />
+      <Stat label="Avg sale" value={formatAmount(stats.avgSale)} dark={dark} />
+      {stats.highest && <Stat label={`Top: ${stats.highest.name}`} value={formatAmount(stats.highest.price)} color="#F59E0B" dark={dark} />}
     </Stack>
   );
 }

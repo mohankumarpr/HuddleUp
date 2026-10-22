@@ -13,6 +13,7 @@ import BidHistoryList from "../common/BidHistoryList";
 import SoundToggleButton from "../common/SoundToggleButton";
 import LoadingSpinner from "../LoadingSpinner";
 import { APP_NAME } from "../../branding";
+import { formatAmount } from "../../utils/formatAmount";
 
 export default function SpectatorView() {
   const { eventSlug } = useParams();
@@ -162,7 +163,7 @@ export default function SpectatorView() {
                       }}
                     />
                     <Typography variant="caption" sx={{ color: "grey.400" }}>
-                      {team.purseRemaining} / {team.purseTotal}
+                      {formatAmount(team.purseRemaining)} / {formatAmount(team.purseTotal)}
                     </Typography>
                   </Paper>
                 </motion.div>

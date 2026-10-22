@@ -23,6 +23,7 @@ import { promoteRegistrationToPlayer, rejectRegistrationRequest } from "../../ut
 import { logActivity } from "../../utils/firebase/activityLog";
 import { genderMeta } from "../../utils/gender";
 import GenderBadge from "../common/GenderBadge";
+import { formatAmount } from "../../utils/formatAmount";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -53,7 +54,7 @@ export default function RegistrationReviewQueue() {
 
   function openApprove(registration) {
     setApproving(registration);
-    setBasePrice(String(registration.requestedBasePrice || ""));
+    setBasePrice(String(registration.requestedBasePrice || 5000000));
     setError(null);
   }
 
@@ -142,7 +143,7 @@ export default function RegistrationReviewQueue() {
                 )}
               </Box>
               {registration.requestedBasePrice != null && (
-                <Chip label={`Requested: ${registration.requestedBasePrice}`} size="small" />
+                <Chip label={`Requested: ${formatAmount(registration.requestedBasePrice)}`} size="small" />
               )}
               <Button size="small" onClick={() => handleReject(registration)}>
                 Reject

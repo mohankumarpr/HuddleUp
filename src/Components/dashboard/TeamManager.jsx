@@ -45,6 +45,7 @@ import {
   updateTeam,
 } from "../../utils/firebase/events";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
+import { formatAmount } from "../../utils/formatAmount";
 import { logActivity } from "../../utils/firebase/activityLog";
 import QrCodeButton from "../common/QrCodeButton";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
@@ -296,7 +297,7 @@ export default function TeamManager() {
       {teams.length > 0 && (
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
           <Chip label={`${teams.length} team${teams.length === 1 ? "" : "s"}`} size="small" variant="outlined" />
-          <Chip label={`Purse remaining ${totalPurseRemaining} / ${totalPurse}`} size="small" variant="outlined" color="primary" />
+          <Chip label={`Purse remaining ${formatAmount(totalPurseRemaining)} / ${formatAmount(totalPurse)}`} size="small" variant="outlined" color="primary" />
         </Stack>
       )}
 
@@ -344,7 +345,7 @@ export default function TeamManager() {
                         Purse remaining
                       </Typography>
                       <Typography variant="caption" fontWeight={600}>
-                        {team.purseRemaining} / {team.purseTotal}
+                        {formatAmount(team.purseRemaining)} / {formatAmount(team.purseTotal)}
                       </Typography>
                     </Stack>
                     <LinearProgress

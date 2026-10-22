@@ -1,5 +1,6 @@
 import React from "react";
 import { Alert, Button, Stack } from "@mui/material";
+import { formatAmount } from "../../utils/formatAmount";
 
 // Shown both on the organizer console and inside the full-screen "on the block" dialog -- a swap
 // offer can arrive at any time, including mid-auction while that dialog covers the whole screen,
@@ -26,7 +27,7 @@ export default function SwapRequestsPanel({ swapRequests, players, teams, busy, 
             }
           >
             Both sides agreed: move {player?.name || "a player"} from {fromTeam?.name || "a team"} to{" "}
-            {toTeam?.name || "a team"} for {req.price}.
+            {toTeam?.name || "a team"} for {formatAmount(req.price)}.
           </Alert>
         );
       })}
@@ -36,7 +37,7 @@ export default function SwapRequestsPanel({ swapRequests, players, teams, busy, 
         const toTeam = teams.find((t) => t.id === req.requesterTeamId);
         return (
           <Alert key={req.id} severity="info">
-            {toTeam?.name || "A team"} offered {fromTeam?.name || "a team"} {req.price} for{" "}
+            {toTeam?.name || "A team"} offered {fromTeam?.name || "a team"} {formatAmount(req.price)} for{" "}
             {player?.name || "a player"} -- waiting for {fromTeam?.name || "them"} to respond.
           </Alert>
         );

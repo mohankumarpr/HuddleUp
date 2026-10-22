@@ -3,6 +3,7 @@ import { Avatar, Box, Chip, Dialog, IconButton, Stack, Typography } from "@mui/m
 import CloseIcon from "@mui/icons-material/Close";
 import StarIcon from "@mui/icons-material/Star";
 import GenderBadge from "../common/GenderBadge";
+import { formatAmount } from "../../utils/formatAmount";
 
 const STATUS_LABEL = {
   pool: "In pool",
@@ -80,7 +81,7 @@ export default function PlayerDetailDialog({ open, player, privateInfo, sportNam
               <GenderBadge gender={player.gender} sx={{ fontSize: 12 }} />
               <Chip
                 size="small"
-                label={`Base ${player.basePrice}`}
+                label={`Base ${formatAmount(player.basePrice)}`}
                 variant="outlined"
                 sx={{ color: "grey.300", borderColor: "rgba(255,255,255,0.3)", fontSize: 12 }}
               />
@@ -88,7 +89,7 @@ export default function PlayerDetailDialog({ open, player, privateInfo, sportNam
 
             {player.status === "sold" && (
               <Typography sx={{ mt: 1.5, color: "success.light", fontWeight: 600 }}>
-                Sold to {soldTeam?.name || "Unknown team"} for {player.soldPrice}
+                Sold to {soldTeam?.name || "Unknown team"} for {formatAmount(player.soldPrice)}
               </Typography>
             )}
 

@@ -51,6 +51,7 @@ import {
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { logActivity } from "../../utils/firebase/activityLog";
 import { playSwapSound } from "../../utils/sound";
+import { formatAmount } from "../../utils/formatAmount";
 import { useAuctionRoom } from "./useAuctionRoom";
 import PlayerOnBlockDialog from "./PlayerOnBlockDialog";
 import AuctionStatsBar from "./AuctionStatsBar";
@@ -366,7 +367,7 @@ export default function OrganizerConsole() {
       logActivity(eventId, {
         actorUid: user.uid,
         action: "swap_completed",
-        summary: `Swapped ${player?.name || "a player"} from ${fromTeam?.name || "a team"} to ${toTeam?.name || "a team"} for ${req.price}`,
+        summary: `Swapped ${player?.name || "a player"} from ${fromTeam?.name || "a team"} to ${toTeam?.name || "a team"} for ${formatAmount(req.price)}`,
       });
     });
   }
@@ -436,7 +437,7 @@ export default function OrganizerConsole() {
           }
         >
           {undo.type === "sold"
-            ? `Last action: sold ${undoPlayerName || "a player"} to ${undoTeamName || "a team"} for ${undo.price}.`
+            ? `Last action: sold ${undoPlayerName || "a player"} to ${undoTeamName || "a team"} for ${formatAmount(undo.price)}.`
             : `Last action: marked ${undoPlayerName || "a player"} unsold.`}
         </Alert>
       )}
@@ -538,7 +539,7 @@ export default function OrganizerConsole() {
                                 </Typography>
                               </Stack>
                             }
-                            secondary={`Base price ${player.basePrice}${heldBack ? " · held back" : ""}`}
+                            secondary={`Base price ${formatAmount(player.basePrice)}${heldBack ? " · held back" : ""}`}
                           />
                         </ListItem>
                       );
@@ -580,7 +581,7 @@ export default function OrganizerConsole() {
                         <ListItemAvatar>
                           <Avatar src={player.photoUrl} alt={player.name} />
                         </ListItemAvatar>
-                        <ListItemText primary={player.name} secondary={`${soldTeam?.name || "Unknown team"} · ${player.soldPrice}`} />
+                        <ListItemText primary={player.name} secondary={`${soldTeam?.name || "Unknown team"} · ${formatAmount(player.soldPrice)}`} />
                       </ListItem>
                     );
                   })}
@@ -610,7 +611,7 @@ export default function OrganizerConsole() {
                       <ListItemAvatar>
                         <Avatar src={player.photoUrl} alt={player.name} />
                       </ListItemAvatar>
-                      <ListItemText primary={player.name} secondary={`Base price ${player.basePrice}`} />
+                      <ListItemText primary={player.name} secondary={`Base price ${formatAmount(player.basePrice)}`} />
                     </ListItem>
                   ))}
                 </List>
