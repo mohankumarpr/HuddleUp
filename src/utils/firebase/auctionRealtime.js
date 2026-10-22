@@ -76,6 +76,10 @@ export async function getOrCreateAuctionState(eventId) {
     round: 0,
     version: 0,
     undo: null,
+    // The single most recent bid on the player currently on the block -- lets the team that placed
+    // it withdraw it (see withdrawBid) as long as no one has bid over them since. Cleared whenever
+    // the block moves to a new player or the sale is confirmed, same lifecycle as `undo`.
+    lastBid: null,
     updatedAt: serverTimestamp(),
     updatedBy: null,
   };
@@ -113,6 +117,7 @@ export async function startPlayerOnBlock(eventId, player, organizerUid) {
     // Starting a new pick retires any pending undo -- reverting a sale from a few players ago
     // while a new one is already on the block would be confusing, not helpful.
     undo: null,
+    lastBid: null,
     version: increment(1),
     updatedAt: serverTimestamp(),
     updatedBy: organizerUid,
@@ -217,17 +222,29 @@ export async function placeBid(eventId, teamId, repUid) {
       throw new AppError("EXCEEDS_RESERVE_CAP");
     }
 
+    const bidRef = doc(collection(db, "events", eventId, "bids"));
+
     tx.update(sRef, {
       currentPrice: proposedPrice,
       currentHighBidTeamId: teamId,
       currentHighBidderUid: repUid,
       // A bid resets the clock, same as a real auctioneer re-starting the count on a new bid.
       ...(state.bidTimerSeconds ? { blockDeadlineAt: Date.now() + state.bidTimerSeconds * 1000 } : {}),
+      // Lets this team (and only this team, and only until someone else bids) withdraw this exact
+      // bid -- see withdrawBid. Overwritten by the next bid, so only the most recent one is ever
+      // reclaimable.
+      lastBid: {
+        playerId: state.currentPlayerId,
+        teamId,
+        bidId: bidRef.id,
+        previousPrice: state.currentPrice,
+        previousHighBidTeamId: state.currentHighBidTeamId,
+        previousHighBidderUid: state.currentHighBidderUid,
+      },
       version: increment(1),
       updatedAt: serverTimestamp(),
     });
 
-    const bidRef = doc(collection(db, "events", eventId, "bids"));
     tx.set(bidRef, {
       playerId: state.currentPlayerId,
       teamId,
@@ -235,6 +252,49 @@ export async function placeBid(eventId, teamId, repUid) {
       amount: proposedPrice,
       placedAt: serverTimestamp(),
     });
+  });
+}
+
+// Team-rep action -- lets the team that placed the single most recent bid on the player currently
+// on the block take it back, reverting the price and high bidder to whatever they were right
+// before that bid. Usable exactly once per team for the whole auction (like the one swap), checked
+// transactionally so it can't be bypassed by a stale client. Only the most recent bid is ever
+// withdrawable -- once another team bids over it, lastBid points at their bid instead and this
+// team's window has closed.
+export async function withdrawBid(eventId, teamId) {
+  const sRef = stateRef(eventId);
+  const tRef = doc(db, "events", eventId, "teams", teamId);
+
+  return runTransaction(db, async (tx) => {
+    const [stateSnap, teamSnap] = await Promise.all([tx.get(sRef), tx.get(tRef)]);
+    if (!stateSnap.exists() || !teamSnap.exists()) throw new AppError("NOT_LIVE");
+
+    const state = stateSnap.data();
+    const team = teamSnap.data();
+    const lastBid = state.lastBid;
+
+    if (
+      !lastBid ||
+      lastBid.playerId !== state.currentPlayerId ||
+      lastBid.teamId !== teamId ||
+      state.currentHighBidTeamId !== teamId
+    ) {
+      throw new AppError("NOTHING_TO_WITHDRAW");
+    }
+    if (team.bidWithdrawUsed) {
+      throw new AppError("BID_WITHDRAW_ALREADY_USED");
+    }
+
+    tx.update(sRef, {
+      currentPrice: lastBid.previousPrice,
+      currentHighBidTeamId: lastBid.previousHighBidTeamId,
+      currentHighBidderUid: lastBid.previousHighBidderUid,
+      lastBid: null,
+      version: increment(1),
+      updatedAt: serverTimestamp(),
+    });
+    tx.update(doc(db, "events", eventId, "bids", lastBid.bidId), { withdrawn: true });
+    tx.update(tRef, { bidWithdrawUsed: true });
   });
 }
 
@@ -278,6 +338,7 @@ export async function confirmSold(eventId, organizerUid) {
       biddingOpen: false,
       blockDeadlineAt: null,
       undo,
+      lastBid: null,
       version: increment(1),
       updatedAt: serverTimestamp(),
       updatedBy: organizerUid,
@@ -302,6 +363,7 @@ export async function markUnsold(eventId, organizerUid) {
       biddingOpen: false,
       blockDeadlineAt: null,
       undo: { type: "unsold", playerId: state.currentPlayerId },
+      lastBid: null,
       version: increment(1),
       updatedAt: serverTimestamp(),
       updatedBy: organizerUid,

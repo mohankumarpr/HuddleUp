@@ -22,6 +22,7 @@ import BidTimer from "./BidTimer";
 import BidHistoryList from "../common/BidHistoryList";
 import GenderBadge from "../common/GenderBadge";
 import SwapRequestsPanel from "../common/SwapRequestsPanel";
+import TeamPurseList from "../common/TeamPurseList";
 import {
   computeGenderQuota,
   computePoolGenderTotals,
@@ -64,6 +65,10 @@ export default function PlayerOnBlockDialog({
   const accent = highBidTeam?.color || "#6366F1";
   const [proxyTeamId, setProxyTeamId] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Expanded by default (unlike bid history) -- this is exactly what the organizer needs to glance
+  // at while running a live bid, not something to dig for. Still collapsible for screens tight on
+  // room, or events with a lot of teams.
+  const [teamsOpen, setTeamsOpen] = useState(true);
 
   // Reset the picker and collapse history back down whenever a new player comes on the block.
   useEffect(() => {
@@ -374,6 +379,33 @@ export default function PlayerOnBlockDialog({
                   )}
                 </Box>
               )}
+
+              {/* Every team's purse, gender progress, and max bid cap -- the console's own "Teams"
+                  panel is hidden behind this full-screen dialog the whole time a player is on the
+                  block, so it's surfaced here too instead of making the organizer hunt for it. */}
+              <Accordion
+                expanded={teamsOpen}
+                onChange={(_, isOpen) => setTeamsOpen(isOpen)}
+                disableGutters
+                square
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.05)",
+                  color: "#fff",
+                  borderRadius: 2,
+                  mb: 2,
+                  "&:before": { display: "none" },
+                  boxShadow: "none",
+                }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: "grey.400" }} />}>
+                  <Typography variant="subtitle2" fontWeight={600} sx={{ color: "grey.200" }}>
+                    Teams
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ maxHeight: 260, overflowY: "auto" }}>
+                  <TeamPurseList teams={teams} players={allPlayers || []} reserveSlotPrice={reserveSlotPrice} dark />
+                </AccordionDetails>
+              </Accordion>
 
               <Accordion
                 expanded={historyOpen}

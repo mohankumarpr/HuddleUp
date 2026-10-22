@@ -113,11 +113,14 @@ service cloud.firestore {
       match /teams/{teamId} {
         allow read: if true;
         allow create, delete: if isOrgMember(eventId);
-        // Organizers manage the team doc; the only field a team rep may ever touch directly
-        // is purseRemaining, and only via the confirmSold transaction path.
+        // Organizers manage the team doc; the only fields a team rep may ever touch directly are
+        // purseRemaining (via the confirmSold transaction path) and bidWithdrawUsed (via
+        // withdrawBid, and only to flip it on -- never back off).
         allow update: if isOrgMember(eventId) ||
           (isTeamRepFor(eventId, teamId) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['purseRemaining']));
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['purseRemaining', 'bidWithdrawUsed']) &&
+            (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['bidWithdrawUsed']) ||
+              request.resource.data.bidWithdrawUsed == true));
       }
 
       match /registrations/{regId} {
@@ -193,8 +196,11 @@ service cloud.firestore {
         allow read: if true; // every live-room view (organizer/bidder/spectator) listens here
         allow create: if isOrgMember(eventId);
         // Organizer: full control of status/currentPlayerId/etc.
-        // Team rep: may ONLY raise currentPrice on behalf of their own team, on a live auction,
-        // for the same player, by exactly the fields a bid touches -- nothing else.
+        // Team rep placing a bid: may ONLY raise currentPrice on behalf of their own team, on a
+        // live auction, for the same player, by exactly the fields a bid touches -- nothing else.
+        // Team rep withdrawing their own last bid: may ONLY lower currentPrice back down, and only
+        // while they're still the team on top and lastBid still points at their own bid -- see
+        // withdrawBid in auctionRealtime.js.
         allow update: if isOrgMember(eventId) ||
           (
             isSignedIn() &&
@@ -204,14 +210,35 @@ service cloud.firestore {
             request.resource.data.currentPlayerId == resource.data.currentPlayerId &&
             request.resource.data.currentPrice > resource.data.currentPrice &&
             request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['currentPrice', 'currentHighBidTeamId', 'currentHighBidderUid', 'blockDeadlineAt', 'version', 'updatedAt'])
+              .hasOnly(['currentPrice', 'currentHighBidTeamId', 'currentHighBidderUid', 'lastBid', 'blockDeadlineAt', 'version', 'updatedAt'])
+          ) ||
+          (
+            isSignedIn() &&
+            isTeamRepFor(eventId, resource.data.currentHighBidTeamId) &&
+            resource.data.status == 'live' &&
+            request.resource.data.status == resource.data.status &&
+            request.resource.data.currentPlayerId == resource.data.currentPlayerId &&
+            request.resource.data.currentPrice < resource.data.currentPrice &&
+            resource.data.lastBid != null &&
+            resource.data.lastBid.teamId == resource.data.currentHighBidTeamId &&
+            request.resource.data.lastBid == null &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['currentPrice', 'currentHighBidTeamId', 'currentHighBidderUid', 'lastBid', 'version', 'updatedAt'])
           );
       }
 
       match /bids/{bidId} {
         allow read: if true;
         allow create: if isOrgMember(eventId) || isTeamRepFor(eventId, request.resource.data.teamId);
-        allow update, delete: if false; // append-only audit trail
+        // Append-only, except the one bid a team just withdrew gets flagged so the history shows
+        // it crossed out instead of silently vanishing -- see withdrawBid in auctionRealtime.js.
+        allow update: if isOrgMember(eventId) ||
+          (
+            isTeamRepFor(eventId, resource.data.teamId) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['withdrawn']) &&
+            request.resource.data.withdrawn == true
+          );
+        allow delete: if false;
       }
 
       // A team-to-team "buy this player from you" offer. The requesting team's rep creates it; the

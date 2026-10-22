@@ -32,7 +32,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { useNavigationGuard } from "../../context/NavigationGuardContext";
 import { getEventBySlug, getTeamRep, subscribeToSports } from "../../utils/firebase/events";
-import { nextIncrement, placeBid } from "../../utils/firebase/auctionRealtime";
+import { nextIncrement, placeBid, withdrawBid } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import {
@@ -153,6 +153,7 @@ export default function TeamBidderView() {
   const [sports, setSports] = useState([]);
   const [error, setError] = useState(null);
   const [bidding, setBidding] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [soldOpen, setSoldOpen] = useState(false);
@@ -308,6 +309,25 @@ export default function TeamBidderView() {
       setError(friendlyErrorMessage(err));
     } finally {
       setBidding(false);
+    }
+  }
+
+  async function handleWithdrawBid() {
+    const ok = await confirm({
+      title: "Withdraw your bid?",
+      description: "Your bid will be pulled back to whoever (or wherever) it was before. This is your one bid withdrawal for the whole auction -- you won't be able to do this again.",
+      confirmLabel: "Withdraw bid",
+      destructive: true,
+    });
+    if (!ok) return;
+    setError(null);
+    setWithdrawing(true);
+    try {
+      await withdrawBid(event.id, teamRep.teamId);
+    } catch (err) {
+      setError(friendlyErrorMessage(err));
+    } finally {
+      setWithdrawing(false);
     }
   }
 
@@ -604,6 +624,23 @@ export default function TeamBidderView() {
             : `Bid ${proposedPrice}`}
         </Button>
       </motion.div>
+
+      {alreadyHighBidder && myTeam && (
+        <Button
+          fullWidth
+          size="small"
+          color="error"
+          disabled={myTeam.bidWithdrawUsed || withdrawing}
+          onClick={handleWithdrawBid}
+          sx={{ mt: 1 }}
+        >
+          {myTeam.bidWithdrawUsed
+            ? "Bid withdrawal already used for this auction"
+            : withdrawing
+            ? "Withdrawing..."
+            : "Withdraw my bid (one-time use)"}
+        </Button>
+      )}
 
       <Divider sx={{ my: 3 }} />
 

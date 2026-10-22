@@ -35,6 +35,8 @@ import {
   deleteTeam,
   getTeamOwners,
   randomDigits,
+  resetTeamBidWithdrawUsed,
+  resetTeamSwapUsed,
   restoreTeam,
   saveTeamDetails,
   subscribeToDeletedTeams,
@@ -248,6 +250,24 @@ export default function TeamManager() {
     }
   }
 
+  async function handleResetSwap(team) {
+    const ok = await confirm({
+      title: `Let ${team.name} swap again?`,
+      description: "This gives them back their one-time swap-a-player offer for the rest of the auction.",
+      confirmLabel: "Reset swap",
+    });
+    if (ok) await resetTeamSwapUsed(eventId, team.id);
+  }
+
+  async function handleResetBidWithdraw(team) {
+    const ok = await confirm({
+      title: `Let ${team.name} withdraw a bid again?`,
+      description: "This gives them back their one-time bid withdrawal for the rest of the auction.",
+      confirmLabel: "Reset withdrawal",
+    });
+    if (ok) await resetTeamBidWithdrawUsed(eventId, team.id);
+  }
+
   if (!teams || !event) return <LoadingSpinner />;
 
   const totalPurseRemaining = teams.reduce((sum, t) => sum + (t.purseRemaining || 0), 0);
@@ -355,6 +375,29 @@ export default function TeamManager() {
                       />
                     ))}
                   </Stack>
+
+                  {(team.swapUsed || team.bidWithdrawUsed) && (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                      {team.swapUsed && (
+                        <Chip
+                          size="small"
+                          label="Swap used"
+                          title="Let them swap again"
+                          onDelete={() => handleResetSwap(team)}
+                          deleteIcon={<AutorenewIcon fontSize="small" />}
+                        />
+                      )}
+                      {team.bidWithdrawUsed && (
+                        <Chip
+                          size="small"
+                          label="Bid withdrawal used"
+                          title="Let them withdraw a bid again"
+                          onDelete={() => handleResetBidWithdraw(team)}
+                          deleteIcon={<AutorenewIcon fontSize="small" />}
+                        />
+                      )}
+                    </Stack>
+                  )}
                 </Box>
 
                 <Stack

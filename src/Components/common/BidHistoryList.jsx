@@ -34,7 +34,7 @@ export default function BidHistoryList({ bids, teams, dense = false, emptyText =
     <List dense={dense} disablePadding>
       {bids.map((bid, i) => {
         const team = teams.find((t) => t.id === bid.teamId);
-        const isTop = highlightTop && i === 0;
+        const isTop = highlightTop && i === 0 && !bid.withdrawn;
         return (
           <ListItem
             key={bid.id}
@@ -42,6 +42,7 @@ export default function BidHistoryList({ bids, teams, dense = false, emptyText =
             divider={!dark}
             sx={{
               ...(dark ? { borderBottom: "1px solid rgba(255,255,255,0.1)" } : {}),
+              ...(bid.withdrawn && { opacity: 0.5 }),
               ...(isTop && {
                 borderRadius: 1.5,
                 bgcolor: dark ? "rgba(16,185,129,0.18)" : "rgba(16,185,129,0.12)",
@@ -54,10 +55,14 @@ export default function BidHistoryList({ bids, teams, dense = false, emptyText =
             <ListItemText
               primary={
                 <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography component="span" sx={{ fontWeight: isTop ? 700 : 400, ...textSx }}>
+                  <Typography
+                    component="span"
+                    sx={{ fontWeight: isTop ? 700 : 400, textDecoration: bid.withdrawn ? "line-through" : "none", ...textSx }}
+                  >
                     {team?.name || "Unknown team"}
                   </Typography>
                   {isTop && <Chip size="small" label="Leading" color="success" sx={{ height: 18, fontSize: 11 }} />}
+                  {bid.withdrawn && <Chip size="small" label="Withdrawn" sx={{ height: 18, fontSize: 11 }} />}
                 </Stack>
               }
               secondary={timeAgo(bid.placedAt)}

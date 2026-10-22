@@ -257,6 +257,7 @@ export async function createTeam(eventId, { name, owners, purseTotal, color }, c
     repUids: [],
     joinPin: randomDigits(4),
     swapUsed: false,
+    bidWithdrawUsed: false,
     createdAt: serverTimestamp(),
   });
   return ref.id;
@@ -280,6 +281,18 @@ export async function saveTeamDetails(eventId, team, { name, owners, purseTotal,
 
 export async function updateTeam(eventId, teamId, patch) {
   await updateDoc(doc(db, "events", eventId, "teams", teamId), patch);
+}
+
+// Lets the organizer un-burn a team's one-time swap or bid-withdrawal allowance -- e.g. it was used
+// by mistake, or the organizer wants to extend a courtesy. Plain update, not a transaction: only
+// the organizer can touch these fields (see firestore.rules) and there's no concurrent money
+// movement here to race against.
+export async function resetTeamSwapUsed(eventId, teamId) {
+  await updateDoc(doc(db, "events", eventId, "teams", teamId), { swapUsed: false });
+}
+
+export async function resetTeamBidWithdrawUsed(eventId, teamId) {
+  await updateDoc(doc(db, "events", eventId, "teams", teamId), { bidWithdrawUsed: false });
 }
 
 async function assertTeamHasNoSoldPlayers(eventId, teamId) {

@@ -8,6 +8,7 @@ const {
   getEventJoinCode,
   getTeamByName,
 } = require("./utils/helpers");
+const { getDocument, fieldValue } = require("./utils/firestoreRest");
 
 // The core feature of the whole app: organizer runs the live auction, a team rep joins from a
 // separate device/session and bids, the organizer confirms the sale, and money + player status
@@ -113,4 +114,106 @@ test("organizer runs an auction, a team rep bids, the sale is confirmed, and the
 
   const teamAAfter = await getTeamByName(eventId, teamAName);
   expect(teamAAfter.purseRemaining).toBe(10000 - expectedBid);
+});
+
+// A team rep can take back their own leading bid -- but only once for the whole auction, mirroring
+// the one-swap-per-team limit. Withdrawing should put the auction state back exactly as it was
+// before that bid (no one leading, price back to base) and leave an audit trail in the bid history.
+test("a team rep can withdraw their one leading bid, then can't do it again", async ({ page, browser }) => {
+  const suffix = uniqueSuffix();
+  const email = `organizer-${suffix}@example.com`;
+  const password = "Passw0rd!123";
+  const orgName = `Test Org ${suffix}`;
+  const eventName = `Withdraw Night ${suffix}`;
+  const teamAName = `Royals ${suffix}`;
+  const playerName = `Taylor Player ${suffix}`;
+  const basePrice = 100;
+  const expectedBid = 150; // nextIncrement(100, DEFAULT_LADDER)
+
+  await signUpOrganizer(page, { displayName: "Morgan Organizer", orgName, email, password });
+  const eventId = await createEvent(page, { name: eventName, purseDefault: 10000 });
+  await addTeam(page, eventId, { name: teamAName, purseTotal: 10000 });
+
+  await page.goto(`/app/events/${eventId}/import`);
+  const csv = `name,base_price\n${playerName},${basePrice}\n`;
+  await page.locator('[data-testid="csv-input"]').setInputFiles({
+    name: "players.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
+  await expect(page.getByText(`${playerName}`, { exact: false })).toBeVisible({ timeout: 15000 });
+  await page.getByRole("button", { name: /^Import 1 player$/i }).click();
+  await expect(page.getByText(/^Imported 1 player/, { exact: false })).toBeVisible({ timeout: 15000 });
+
+  await page.goto(`/app/events/${eventId}/console`);
+  await page.getByRole("button", { name: /^Start auction$/i }).click();
+  await expect(page.getByText(/^live$/i)).toBeVisible({ timeout: 15000 });
+  await page.getByRole("button", { name: /^Pick random player$/i }).click();
+  await expect(page.getByText("On the block", { exact: true })).toBeVisible({ timeout: 15000 });
+  await page.getByRole("button", { name: /^Start bidding$/i }).click();
+
+  const slug = await getEventSlug(eventId);
+  const joinCode = await getEventJoinCode(eventId);
+  const teamA = await getTeamByName(eventId, teamAName);
+
+  const repContext = await browser.newContext();
+  const repPage = await repContext.newPage();
+  try {
+    await repPage.goto(`/e/${slug}/join?code=${joinCode}&team=${teamA.id}&pin=${teamA.joinPin}`);
+    await expect(repPage.getByLabel(/Your name/i)).toBeVisible({ timeout: 15000 });
+    await repPage.getByLabel(/Your name/i).fill("Team Rep");
+    await repPage.getByRole("button", { name: /^Join and bid$/i }).click();
+    await expect(repPage).toHaveURL(new RegExp(`/e/${slug}/bid$`), { timeout: 15000 });
+
+    const bidButton = repPage.getByRole("button", { name: new RegExp(`^Bid ${expectedBid}$`) });
+    await expect(bidButton).toBeVisible({ timeout: 15000 });
+    await bidButton.click();
+    await expect(repPage.getByRole("button", { name: /^You're leading$/i })).toBeVisible({ timeout: 15000 });
+
+    const withdrawButton = repPage.getByRole("button", { name: /^Withdraw my bid \(one-time use\)$/i });
+    await expect(withdrawButton).toBeEnabled({ timeout: 15000 });
+    await withdrawButton.click();
+    await repPage.getByRole("dialog").getByRole("button", { name: /^Withdraw bid$/i }).click();
+
+    // The withdrawal clears the leading status and reopens the bid button -- the auction state is
+    // back to exactly how it was before this bid was ever placed.
+    await expect(repPage.getByRole("button", { name: /^You're leading$/i })).toBeHidden({ timeout: 15000 });
+    await expect(bidButton).toBeVisible({ timeout: 15000 });
+    await expect(repPage.getByText("Withdrawn", { exact: true })).toBeVisible({ timeout: 15000 });
+
+    await expect
+      .poll(async () => {
+        const stateDoc = await getDocument(`events/${eventId}/auction/state`);
+        return fieldValue(stateDoc, "currentHighBidTeamId");
+      }, { timeout: 15000 })
+      .toBeNull();
+
+    // Bidding again works (the withdrawal only burned the one-time allowance, not the ability to
+    // bid), but trying to withdraw a second time is no longer offered.
+    await bidButton.click();
+    await expect(repPage.getByRole("button", { name: /^You're leading$/i })).toBeVisible({ timeout: 15000 });
+    await expect(repPage.getByText("Bid withdrawal already used for this auction", { exact: true })).toBeVisible({
+      timeout: 15000,
+    });
+  } finally {
+    await repContext.close();
+  }
+
+  const teamAAfter = await getDocument(`events/${eventId}/teams/${teamA.id}`);
+  expect(fieldValue(teamAAfter, "bidWithdrawUsed")).toBe(true);
+
+  // The organizer can give the team back its one-time allowance from the Teams page.
+  await page.goto(`/app/events/${eventId}/teams`);
+  const teamACard = page.locator(".MuiPaper-root", { has: page.getByText(teamAName, { exact: true }) }).first();
+  const bidWithdrawChip = teamACard.getByText("Bid withdrawal used", { exact: true }).locator("..");
+  await bidWithdrawChip.getByTestId("AutorenewIcon").click();
+  await page.getByRole("dialog").getByRole("button", { name: /^Reset withdrawal$/i }).click();
+  await expect(teamACard.getByText("Bid withdrawal used", { exact: true })).toBeHidden({ timeout: 15000 });
+
+  await expect
+    .poll(async () => {
+      const doc = await getDocument(`events/${eventId}/teams/${teamA.id}`);
+      return fieldValue(doc, "bidWithdrawUsed");
+    }, { timeout: 15000 })
+    .toBe(false);
 });

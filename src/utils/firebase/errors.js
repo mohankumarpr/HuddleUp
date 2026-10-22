@@ -38,6 +38,8 @@ const FRIENDLY_MESSAGES = {
   SWAP_ALREADY_USED: "This team has already used its one swap for this auction.",
   SWAP_NOT_ACCEPTED: "This swap hasn't been accepted by the other team yet.",
   SWAP_PLAYER_NOT_AVAILABLE: "This player isn't available for that team to swap anymore -- they may have already been moved.",
+  NOTHING_TO_WITHDRAW: "There's no bid of yours left to withdraw -- you may have been outbid, or the player has moved on.",
+  BID_WITHDRAW_ALREADY_USED: "You've already used your one bid withdrawal for this auction.",
 };
 
 export function friendlyErrorMessage(err) {
