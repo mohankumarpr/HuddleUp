@@ -31,7 +31,7 @@ import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { useNavigationGuard } from "../../context/NavigationGuardContext";
-import { getEventBySlug, getTeamRep, subscribeToSports } from "../../utils/firebase/events";
+import { getEventBySlug, getTeamRep, subscribeToEvent, subscribeToSports } from "../../utils/firebase/events";
 import { nextIncrement, placeBid, withdrawBid } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
@@ -57,6 +57,7 @@ import AuctionStatsBar from "../auctionRoom/AuctionStatsBar";
 import BidHistoryList from "../common/BidHistoryList";
 import SoundToggleButton from "../common/SoundToggleButton";
 import TeamPurseList from "../common/TeamPurseList";
+import AmountField from "../common/AmountField";
 import LoadingSpinner from "../LoadingSpinner";
 
 // Offer another team a price for one of their already-sold players. If they accept, the organizer
@@ -64,14 +65,14 @@ import LoadingSpinner from "../LoadingSpinner";
 // price is added to the selling team's purse.
 function SwapRequestDialog({ open, onClose, myTeam, teams, otherTeamPlayers, onSubmit }) {
   const [playerId, setPlayerId] = useState("");
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState(0);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       setPlayerId("");
-      setPrice("");
+      setPrice(0);
       setError(null);
     }
   }, [open]);
@@ -124,12 +125,11 @@ function SwapRequestDialog({ open, onClose, myTeam, teams, otherTeamPlayers, onS
               );
             })}
           </TextField>
-          <TextField
+          <AmountField
+            key={open}
             label="Price you're offering"
-            type="number"
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            fullWidth
+            onChange={setPrice}
             helperText={myTeam ? `Your remaining purse: ${formatAmount(myTeam.purseRemaining)}` : undefined}
           />
           {priceNum > 0 && !canAfford && <Alert severity="warning">Your remaining purse can't cover this offer.</Alert>}
@@ -164,9 +164,23 @@ export default function TeamBidderView() {
   const [swapActionError, setSwapActionError] = useState(null);
   const [respondingId, setRespondingId] = useState(null);
 
+  // Resolves the slug to an event ID once, then switches to a live subscription -- a one-time
+  // fetch here would freeze this screen's event data (reserveSlotPrice, purseDefault, etc.) at
+  // whatever it was when the rep's tab first loaded, which for a reserve price the organizer sets
+  // up after reps have already joined and left their tab open, means it would never show up.
+  const [eventId, setEventId] = useState(undefined); // undefined = resolving, null = not found
   useEffect(() => {
-    (async () => setEvent(await getEventBySlug(eventSlug)))();
+    (async () => {
+      const ev = await getEventBySlug(eventSlug);
+      setEventId(ev ? ev.id : null);
+      if (!ev) setEvent(null);
+    })();
   }, [eventSlug]);
+
+  useEffect(() => {
+    if (!eventId) return undefined;
+    return subscribeToEvent(eventId, setEvent);
+  }, [eventId]);
 
   useEffect(() => {
     if (!event || authLoading) return;
@@ -175,7 +189,11 @@ export default function TeamBidderView() {
       return;
     }
     (async () => setTeamRep(await getTeamRep(event.id, user.uid)))();
-  }, [event, user, authLoading]);
+    // Deliberately keyed on event?.id, not the whole live `event` object -- re-fetching teamRep
+    // on every unrelated field change (reserveSlotPrice, status, ...) the live subscription above
+    // pushes through would be pure waste; this only needs to run when the event itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.id, user, authLoading]);
 
   // A joined rep shouldn't get bounced off this screen by an accidental tap (the navbar logo, a
   // browser back/refresh) without a chance to say so first -- they could be mid-bid.

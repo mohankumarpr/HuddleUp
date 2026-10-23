@@ -16,7 +16,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from "@mui/material";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
@@ -27,6 +26,7 @@ import { subscribeToPlayerPrivate, subscribeToPlayers } from "../../utils/fireba
 import { buildImportRows, identityKey, importPlayers, parseSpreadsheetFile, templateCsv } from "../../utils/firebase/bulkImport";
 import { downloadTextFile } from "../../utils/download";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
+import AmountField from "../common/AmountField";
 import LoadingSpinner from "../LoadingSpinner";
 
 const downloadTemplate = (sportNames) => downloadTextFile("players-template.csv", templateCsv(sportNames));
@@ -175,14 +175,14 @@ export default function PlayerImport() {
               />
             </Button>
             {fileName && <Chip label={`${fileName} · ${parsed?.rows.length ?? 0} rows`} onDelete={() => { setParsed(null); setFileName(""); }} />}
-            <TextField
+            <AmountField
               label="Default base price"
-              type="number"
               size="small"
               value={defaultBasePrice}
-              onChange={(e) => setDefaultBasePrice(e.target.value)}
+              onChange={setDefaultBasePrice}
               helperText="Used when a row has no base_price"
-              sx={{ width: 190 }}
+              fullWidth={false}
+              sx={{ width: 280 }}
             />
           </Stack>
         </Stack>

@@ -12,7 +12,6 @@ import {
   DialogTitle,
   Paper,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
@@ -24,6 +23,7 @@ import { logActivity } from "../../utils/firebase/activityLog";
 import { genderMeta } from "../../utils/gender";
 import GenderBadge from "../common/GenderBadge";
 import { formatAmount } from "../../utils/formatAmount";
+import AmountField from "../common/AmountField";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -33,7 +33,7 @@ export default function RegistrationReviewQueue() {
   const [registrations, setRegistrations] = useState(null);
   const [sports, setSports] = useState([]);
   const [approving, setApproving] = useState(null); // registration being approved
-  const [basePrice, setBasePrice] = useState("");
+  const [basePrice, setBasePrice] = useState(0);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export default function RegistrationReviewQueue() {
 
   function openApprove(registration) {
     setApproving(registration);
-    setBasePrice(String(registration.requestedBasePrice || 5000000));
+    setBasePrice(registration.requestedBasePrice || 5000000);
     setError(null);
   }
 
@@ -160,12 +160,11 @@ export default function RegistrationReviewQueue() {
         <DialogTitle>Approve {approving?.name}</DialogTitle>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          <TextField
+          <AmountField
+            key={approving?.id}
             label="Base price"
-            type="number"
             value={basePrice}
-            onChange={(e) => setBasePrice(e.target.value)}
-            fullWidth
+            onChange={setBasePrice}
             autoFocus
             sx={{ mt: 1 }}
           />

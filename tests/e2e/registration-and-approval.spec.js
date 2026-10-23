@@ -45,7 +45,11 @@ test("public registers for an event, organizer approves it into the player pool"
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel(/Base price/i).fill("150");
+  // The base price field is entered in lakh/crore units with a unit picker (defaults to Lakh) --
+  // switch to Rupees so "150" means 150 rupees, not 150 lakhs.
+  await dialog.getByLabel(/^Unit$/i).click();
+  await page.getByRole("option", { name: "Rupees" }).click();
+  await dialog.getByLabel(/^Base price$/i).fill("150");
   await dialog.getByRole("button", { name: /Add to player pool/i }).click();
   await expect(dialog).toBeHidden({ timeout: 15000 });
 

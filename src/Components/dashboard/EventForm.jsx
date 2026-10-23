@@ -6,6 +6,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../context/AuthContext";
 import { createEvent, getEvent, updateEvent } from "../../utils/firebase/events";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
+import AmountField from "../common/AmountField";
 import LoadingSpinner from "../LoadingSpinner";
 
 export default function EventForm() {
@@ -110,12 +111,11 @@ export default function EventForm() {
               InputLabelProps={{ shrink: true }}
               fullWidth
             />
-            <TextField
+            <AmountField
+              key={eventId || "new"}
               label="Starting purse per team"
-              type="number"
               value={purseDefault}
-              onChange={(e) => setPurseDefault(e.target.value)}
-              fullWidth
+              onChange={setPurseDefault}
             />
             <TextField
               label="Description"

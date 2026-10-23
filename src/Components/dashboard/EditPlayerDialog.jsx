@@ -17,6 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import { compressImageFile } from "../../utils/image";
+import AmountField from "../common/AmountField";
 
 // Edits a player's own details after they're already in the pool -- correcting a typo, fixing the
 // base price, adding sports they forgot to select, or re-uploading a photo. Deliberately does NOT
@@ -26,7 +27,7 @@ export default function EditPlayerDialog({ open, player, privateInfo, sports, on
   const [name, setName] = useState("");
   const [gender, setGender] = useState("");
   const [sportIds, setSportIds] = useState([]);
-  const [basePrice, setBasePrice] = useState("");
+  const [basePrice, setBasePrice] = useState(0);
   const [aboutMe, setAboutMe] = useState("");
   const [photoDataUrl, setPhotoDataUrl] = useState(null);
   const [email, setEmail] = useState("");
@@ -41,7 +42,7 @@ export default function EditPlayerDialog({ open, player, privateInfo, sports, on
     setName(player.name || "");
     setGender(player.gender || "");
     setSportIds(player.sportIds || []);
-    setBasePrice(player.basePrice ?? "");
+    setBasePrice(player.basePrice ?? 0);
     setAboutMe(player.aboutMe || "");
     setPhotoDataUrl(player.photoUrl || null);
     setEmail(privateInfo?.email || "");
@@ -130,21 +131,18 @@ export default function EditPlayerDialog({ open, player, privateInfo, sports, on
 
           <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required fullWidth autoFocus />
 
-          <Stack direction="row" spacing={2}>
-            <TextField select label="Gender" value={gender} onChange={(e) => setGender(e.target.value)} fullWidth>
-              <MenuItem value="">Not specified</MenuItem>
-              <MenuItem value="male">Male</MenuItem>
-              <MenuItem value="female">Female</MenuItem>
-              <MenuItem value="other">Other</MenuItem>
-            </TextField>
-            <TextField
-              label="Base price"
-              type="number"
-              value={basePrice}
-              onChange={(e) => setBasePrice(e.target.value)}
-              fullWidth
-            />
-          </Stack>
+          <TextField select label="Gender" value={gender} onChange={(e) => setGender(e.target.value)} fullWidth>
+            <MenuItem value="">Not specified</MenuItem>
+            <MenuItem value="male">Male</MenuItem>
+            <MenuItem value="female">Female</MenuItem>
+            <MenuItem value="other">Other</MenuItem>
+          </TextField>
+          <AmountField
+            key={`${player?.id || "none"}-${open}`}
+            label="Base price"
+            value={basePrice}
+            onChange={setBasePrice}
+          />
 
           <Box>
             <Typography variant="subtitle2" gutterBottom>

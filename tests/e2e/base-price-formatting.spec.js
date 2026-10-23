@@ -22,10 +22,11 @@ test("base prices display as lakhs/crore, and the organizer can set one base pri
 
   // One row with an explicit crore-scale base price, one row with none at all -- the latter should
   // pick up the import screen's "Default base price" field, which should itself now default to 50
-  // lakhs instead of the old placeholder value of 100.
+  // lakhs instead of the old placeholder value of 100. It's entered in lakh/crore units with a unit
+  // picker, not raw rupees, so 50 lakhs shows as "50" with "Lakh" selected.
   await page.goto(`/app/events/${eventId}/import`);
-  const defaultBasePriceField = page.getByLabel(/Default base price/i);
-  await expect(defaultBasePriceField).toHaveValue("5000000");
+  const defaultBasePriceField = page.getByLabel(/^Default base price$/i);
+  await expect(defaultBasePriceField).toHaveValue("50");
 
   const csv = `name,base_price\n${playerA},12500000\n${playerB},\n`;
   await page.locator('[data-testid="csv-input"]').setInputFiles({
@@ -43,9 +44,10 @@ test("base prices display as lakhs/crore, and the organizer can set one base pri
   await expect(page.getByText("Base price 1.25 crore", { exact: false })).toBeVisible();
   await expect(page.getByText("Base price 50 lakhs", { exact: false })).toBeVisible();
 
-  // The organizer sets one base price for every player at once, from the Roster planning panel.
-  const basePriceField = page.getByLabel("Base price for every player");
-  await basePriceField.fill("6000000");
+  // The organizer sets one base price for every player at once, from the Roster planning panel --
+  // entered as "60" lakhs (the field defaults to the Lakh unit), not the raw rupee figure.
+  const basePriceField = page.getByLabel(/^Base price for every player$/i);
+  await basePriceField.fill("60");
   await page.getByRole("button", { name: /^Set for all players$/i }).click();
   await page.getByRole("dialog").getByRole("button", { name: /^Set for all players$/i }).click();
 

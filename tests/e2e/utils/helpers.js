@@ -14,6 +14,18 @@ function reqLabel(text) {
   return new RegExp(`^${escaped}\\s*\\*?\\s*$`, "i");
 }
 
+// Money fields (see AmountField.jsx) pair a plain number input with a Crore/Lakh/Rupees unit
+// picker that defaults to whatever unit best fits the field's current value -- fine for a human,
+// but a test that just types a raw rupee figure needs the unit pinned to Rupees first, or e.g.
+// filling "100000000" while the field guessed "Crore" would be read as 100000000 crore. `scope` is
+// the page (or a dialog locator within it) containing exactly one such field; `page` is always the
+// top-level Page, since the unit dropdown's menu renders in a portal outside any dialog's subtree.
+async function fillRupeeAmount(page, scope, labelRe, amount) {
+  await scope.getByLabel(/^Unit$/i).first().click();
+  await page.getByRole("option", { name: "Rupees" }).click();
+  await scope.getByLabel(labelRe).fill(String(amount));
+}
+
 async function signUpOrganizer(page, { displayName, orgName, email, password }) {
   await page.goto("/signup");
   await page.getByLabel(reqLabel("Your name")).fill(displayName);
@@ -34,8 +46,7 @@ async function createEvent(page, { name, venue, purseDefault }) {
   await page.getByLabel(reqLabel("Event name")).fill(name);
   if (venue) await page.getByLabel(/^Venue$/i).fill(venue);
   if (purseDefault != null) {
-    const purseField = page.getByLabel(/Starting purse per team/i);
-    await purseField.fill(String(purseDefault));
+    await fillRupeeAmount(page, page, /^Starting purse per team$/i, purseDefault);
   }
   await page.getByRole("button", { name: /Create event/i }).click();
   await expect(page).toHaveURL(/\/app\/events\/[^/]+$/, { timeout: 20000 });
@@ -63,7 +74,7 @@ async function addTeam(page, eventId, { name, purseTotal }) {
   await expect(dialog).toBeVisible();
   await dialog.getByLabel(reqLabel("Team name")).fill(name);
   if (purseTotal != null) {
-    await dialog.getByLabel(/Starting purse/i).fill(String(purseTotal));
+    await fillRupeeAmount(page, dialog, /^Starting purse$/i, purseTotal);
   }
   await dialog.getByRole("button", { name: /^Save$/i }).click();
   await expect(dialog).toBeHidden({ timeout: 15000 });

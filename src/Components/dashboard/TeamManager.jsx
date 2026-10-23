@@ -48,6 +48,7 @@ import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { formatAmount } from "../../utils/formatAmount";
 import { logActivity } from "../../utils/firebase/activityLog";
 import QrCodeButton from "../common/QrCodeButton";
+import AmountField from "../common/AmountField";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
 import LoadingSpinner from "../LoadingSpinner";
 
@@ -58,7 +59,7 @@ let ownerCounter = 0;
 const blankOwner = () => ({ id: `new${Date.now()}-${ownerCounter++}`, name: "", gender: "", contact: "" });
 
 function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave }) {
-  const [form, setForm] = useState({ name: "", purseTotal: "", color: "#6366f1", owners: [] });
+  const [form, setForm] = useState({ name: "", purseTotal: 0, color: "#6366f1", owners: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -67,9 +68,9 @@ function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave }) {
     setError(null);
     if (team) {
       const owners = getTeamOwners(team).map((o) => ({ ...o }));
-      setForm({ name: team.name, purseTotal: team.purseTotal ?? "", color: team.color || "#6366f1", owners: owners.length ? owners : [blankOwner()] });
+      setForm({ name: team.name, purseTotal: team.purseTotal ?? 0, color: team.color || "#6366f1", owners: owners.length ? owners : [blankOwner()] });
     } else {
-      setForm({ name: "", purseTotal: defaultPurse ?? "", color: DEFAULT_COLORS[colorIndex % DEFAULT_COLORS.length], owners: [blankOwner()] });
+      setForm({ name: "", purseTotal: defaultPurse ?? 0, color: DEFAULT_COLORS[colorIndex % DEFAULT_COLORS.length], owners: [blankOwner()] });
     }
   }, [open, team, defaultPurse, colorIndex]);
 
@@ -116,13 +117,12 @@ function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave }) {
               sx={{ width: 110 }}
             />
           </Stack>
-          <TextField
+          <AmountField
+            key={`${team?.id || "new"}-${open}`}
             label="Starting purse"
-            type="number"
             value={form.purseTotal}
-            onChange={(e) => setForm((f) => ({ ...f, purseTotal: e.target.value }))}
+            onChange={(v) => setForm((f) => ({ ...f, purseTotal: v }))}
             helperText={team ? "Changing this moves the remaining purse by the same amount." : undefined}
-            fullWidth
           />
 
           <Box>

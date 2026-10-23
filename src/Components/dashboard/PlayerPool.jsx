@@ -69,6 +69,7 @@ import { downloadTextFile } from "../../utils/download";
 import { buildResultsCsv } from "../../utils/resultsExport";
 import BidHistoryList from "../common/BidHistoryList";
 import ShareSoldDialog from "../common/ShareSoldDialog";
+import AmountField from "../common/AmountField";
 import EditPlayerDialog from "./EditPlayerDialog";
 import PlayerDetailDialog from "./PlayerDetailDialog";
 import DashboardHero, { heroImageFor } from "./DashboardHero";
@@ -127,7 +128,7 @@ export default function PlayerPool() {
   const [editTarget, setEditTarget] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
   const [event, setEvent] = useState(null);
-  const [reservePriceDraft, setReservePriceDraft] = useState("");
+  const [reservePriceDraft, setReservePriceDraft] = useState(0);
   const [savingReservePrice, setSavingReservePrice] = useState(false);
   const [basePriceDraft, setBasePriceDraft] = useState(5000000);
   const [settingBasePrice, setSettingBasePrice] = useState(false);
@@ -157,13 +158,13 @@ export default function PlayerPool() {
 
   useEffect(() => subscribeToEvent(eventId, setEvent), [eventId]);
   useEffect(() => {
-    setReservePriceDraft(event?.reserveSlotPrice ? String(event.reserveSlotPrice) : "");
+    setReservePriceDraft(event?.reserveSlotPrice || 0);
   }, [event?.reserveSlotPrice]);
 
   async function handleSaveReservePrice() {
     setSavingReservePrice(true);
     try {
-      await updateEvent(eventId, { reserveSlotPrice: Math.max(0, Number(reservePriceDraft) || 0) });
+      await updateEvent(eventId, { reserveSlotPrice: Math.max(0, reservePriceDraft || 0) });
     } finally {
       setSavingReservePrice(false);
     }
@@ -394,13 +395,14 @@ export default function PlayerPool() {
               </Stack>
             )}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
-              <TextField
+              <AmountField
+                key={event?.reserveSlotPrice ?? "unset"}
                 size="small"
                 label="Reserve price per remaining slot"
-                type="number"
                 value={reservePriceDraft}
-                onChange={(e) => setReservePriceDraft(e.target.value)}
-                sx={{ maxWidth: 280 }}
+                onChange={setReservePriceDraft}
+                fullWidth={false}
+                sx={{ maxWidth: 360 }}
               />
               <Button size="small" variant="outlined" disabled={savingReservePrice} onClick={handleSaveReservePrice}>
                 {savingReservePrice ? "Saving..." : "Save"}
@@ -417,14 +419,13 @@ export default function PlayerPool() {
               </Alert>
             )}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} sx={{ mt: 2 }}>
-              <TextField
+              <AmountField
                 size="small"
                 label="Base price for every player"
-                type="number"
                 value={basePriceDraft}
-                onChange={(e) => setBasePriceDraft(e.target.value)}
-                helperText={formatAmount(Number(basePriceDraft) || 0)}
-                sx={{ maxWidth: 280 }}
+                onChange={setBasePriceDraft}
+                fullWidth={false}
+                sx={{ maxWidth: 360 }}
               />
               <Button
                 size="small"
