@@ -198,8 +198,12 @@ service cloud.firestore {
         // Organizer: full control of status/currentPlayerId/etc.
         // Team rep placing a bid: may ONLY raise currentPrice on behalf of their own team, on a
         // live auction, for the same player, by exactly the fields a bid touches -- nothing else.
-        // Team rep withdrawing their own last bid: may ONLY lower currentPrice back down, and only
-        // while they're still the team on top and lastBid still points at their own bid -- see
+        // The very first bid on a player opens right at the base price (currentPrice doesn't move,
+        // only currentHighBidTeamId does -- see nextBidAmount in auctionRealtime.js), so it's only
+        // required to not go DOWN; every bid after that must strictly raise it.
+        // Team rep withdrawing their own last bid: may ONLY lower currentPrice back down (or leave
+        // it unchanged, undoing a first bid that never moved it off the base price), and only while
+        // they're still the team on top and lastBid still points at their own bid -- see
         // withdrawBid in auctionRealtime.js.
         allow update: if isOrgMember(eventId) ||
           (
@@ -208,7 +212,9 @@ service cloud.firestore {
             resource.data.status == 'live' &&
             request.resource.data.status == resource.data.status &&
             request.resource.data.currentPlayerId == resource.data.currentPlayerId &&
-            request.resource.data.currentPrice > resource.data.currentPrice &&
+            (resource.data.currentHighBidTeamId == null
+              ? request.resource.data.currentPrice >= resource.data.currentPrice
+              : request.resource.data.currentPrice > resource.data.currentPrice) &&
             request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['currentPrice', 'currentHighBidTeamId', 'currentHighBidderUid', 'lastBid', 'blockDeadlineAt', 'version', 'updatedAt'])
           ) ||
@@ -218,7 +224,7 @@ service cloud.firestore {
             resource.data.status == 'live' &&
             request.resource.data.status == resource.data.status &&
             request.resource.data.currentPlayerId == resource.data.currentPlayerId &&
-            request.resource.data.currentPrice < resource.data.currentPrice &&
+            request.resource.data.currentPrice <= resource.data.currentPrice &&
             resource.data.lastBid != null &&
             resource.data.lastBid.teamId == resource.data.currentHighBidTeamId &&
             request.resource.data.lastBid == null &&

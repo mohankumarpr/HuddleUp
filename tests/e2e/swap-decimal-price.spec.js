@@ -27,7 +27,7 @@ test("a swap offer entered in crore with a decimal is stored as the exact rupee 
   const teamBName = `Giants ${suffix}`;
   const playerName = `Casey Player ${suffix}`;
   const basePrice = 100;
-  const expectedBid = 150;
+  const expectedBid = basePrice; // the first bid on a player opens right at the base price
   const teamPurse = 500000000; // 5 crore -- comfortably covers a 1.25 crore swap offer
 
   await signUpOrganizer(page, { displayName: "Morgan Organizer", orgName, email, password });

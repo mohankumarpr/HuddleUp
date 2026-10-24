@@ -41,6 +41,17 @@ export function nextIncrement(currentPrice, ladder) {
   return currentPrice + increment_;
 }
 
+// The amount a bid placed right now would set the price to. The very first bid on a player opens
+// right at the base price -- currentPrice already sits there and nobody is leading yet -- not a
+// rung above it; every bid after that raises the price by the ladder's next increment as usual.
+// Pure and state-shaped so the same rule drives the transaction (below), the bidder's "Bid X"
+// button, and the organizer's proxy-bid amount, instead of each recomputing it separately.
+export function nextBidAmount(state) {
+  if (!state) return null;
+  if (!state.currentHighBidTeamId) return state.currentPrice;
+  return nextIncrement(state.currentPrice, state.incrementLadder);
+}
+
 function stateRef(eventId) {
   return doc(db, "events", eventId, "auction", "state");
 }
@@ -206,7 +217,7 @@ export async function placeBid(eventId, teamId, repUid) {
       }
     }
 
-    const proposedPrice = nextIncrement(state.currentPrice, state.incrementLadder);
+    const proposedPrice = nextBidAmount(state);
     if (proposedPrice > team.purseRemaining) {
       throw new AppError("INSUFFICIENT_PURSE");
     }

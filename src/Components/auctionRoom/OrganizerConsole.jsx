@@ -39,7 +39,7 @@ import {
   extendBlockTimer,
   getOrCreateAuctionState,
   markUnsold,
-  nextIncrement,
+  nextBidAmount,
   placeBid,
   revertLastAction,
   setAuctionStatus,
@@ -327,13 +327,13 @@ export default function OrganizerConsole() {
   function handleBidForTeam(teamId) {
     const team = teams.find((t) => t.id === teamId);
     const playerName = currentPlayer?.name;
-    const price = state ? nextIncrement(state.currentPrice, state.incrementLadder) : null;
+    const price = nextBidAmount(state);
     return run(async () => {
       await placeBid(eventId, teamId, user.uid);
       logActivity(eventId, {
         actorUid: user.uid,
         action: "organizer_bid_placed",
-        summary: `Placed a bid of ${price} for ${team?.name || "a team"} on ${playerName || "the player"}`,
+        summary: `Placed a bid of ${formatAmount(price)} for ${team?.name || "a team"} on ${playerName || "the player"}`,
       });
     });
   }
@@ -346,7 +346,7 @@ export default function OrganizerConsole() {
   const undoTeamName = undo?.type === "sold" && teams.find((t) => t.id === undo.teamId)?.name;
   const { eligible: eligiblePoolPlayers, heldBack: heldBackPlayers } = partitionPoolForAuction(poolPlayers);
   const eligibleIds = new Set(eligiblePoolPlayers.map((p) => p.id));
-  const nextBidAmount = state ? nextIncrement(state.currentPrice, state.incrementLadder) : null;
+  const nextBidValue = nextBidAmount(state);
 
   function handleRequeueUnsold(player) {
     return run(async () => {
@@ -666,7 +666,7 @@ export default function OrganizerConsole() {
         busy={busy}
         error={error}
         onDismissError={() => setError(null)}
-        nextBidAmount={nextBidAmount}
+        nextBidAmount={nextBidValue}
         onBidForTeam={handleBidForTeam}
         onConfirmSold={handleConfirmSold}
         onMarkUnsold={handleMarkUnsold}

@@ -26,7 +26,7 @@ test("organizer runs an auction, a team rep bids, the sale is confirmed, and the
   const teamBName = `Giants ${suffix}`;
   const playerName = `Casey Player ${suffix}`;
   const basePrice = 100;
-  const expectedBid = 150; // nextIncrement(100, DEFAULT_LADDER) -> first rung (<1000) increment 50
+  const expectedBid = basePrice; // the first bid on a player opens right at the base price
 
   await signUpOrganizer(page, { displayName: "Morgan Organizer", orgName, email, password });
   const eventId = await createEvent(page, { name: eventName, purseDefault: 10000 });
@@ -128,7 +128,7 @@ test("a team rep can withdraw their one leading bid, then can't do it again", as
   const teamAName = `Royals ${suffix}`;
   const playerName = `Taylor Player ${suffix}`;
   const basePrice = 100;
-  const expectedBid = 150; // nextIncrement(100, DEFAULT_LADDER)
+  const expectedBid = basePrice; // the first bid on a player opens right at the base price
 
   await signUpOrganizer(page, { displayName: "Morgan Organizer", orgName, email, password });
   const eventId = await createEvent(page, { name: eventName, purseDefault: 10000 });

@@ -32,7 +32,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { useNavigationGuard } from "../../context/NavigationGuardContext";
 import { getEventBySlug, getTeamRep, subscribeToEvent, subscribeToSports } from "../../utils/firebase/events";
-import { nextIncrement, placeBid, withdrawBid } from "../../utils/firebase/auctionRealtime";
+import { nextBidAmount, placeBid, withdrawBid } from "../../utils/firebase/auctionRealtime";
 import { friendlyErrorMessage } from "../../utils/firebase/errors";
 import { subscribeToBidsForPlayer } from "../../utils/firebase/auctionRealtime";
 import {
@@ -289,7 +289,7 @@ export default function TeamBidderView() {
   const isLive = Boolean(room.state?.status === "live" && room.state?.currentPlayerId);
   const biddingOpen = Boolean(room.state?.biddingOpen);
   const alreadyHighBidder = room.state?.currentHighBidTeamId === teamRep.teamId;
-  const proposedPrice = room.state ? nextIncrement(room.state.currentPrice, room.state.incrementLadder) : null;
+  const proposedPrice = nextBidAmount(room.state);
 
   // Roster planning: an optional max-bid cap (reserve enough purse for every remaining slot) and
   // an independent men's/women's quota cap -- see auctionQuota.js. Both mirror exactly what
