@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Grid,
   LinearProgress,
   List,
   ListItem,
@@ -389,7 +390,7 @@ export default function TeamBidderView() {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ py: { xs: 3, md: 5 } }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5" fontWeight={700}>
           {event.name}
@@ -400,365 +401,377 @@ export default function TeamBidderView() {
         </Stack>
       </Stack>
 
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 3 }}>
         <AuctionStatsBar stats={room.stats} />
       </Box>
 
-      {myTeam && (
-        <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-          <Stack direction="row" spacing={2} sx={{ mb: 1.5 }}>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                Spent
-              </Typography>
-              <Typography variant="h6">{formatAmount(mySpent)}</Typography>
-            </Box>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                Remaining
-              </Typography>
-              <Typography variant="h6">{formatAmount(myTeam.purseRemaining)}</Typography>
-            </Box>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                Total purse
-              </Typography>
-              <Typography variant="h6">{formatAmount(myTeam.purseTotal)}</Typography>
-            </Box>
-          </Stack>
-          <LinearProgress
-            variant="determinate"
-            value={myTeam.purseTotal ? (myTeam.purseRemaining / myTeam.purseTotal) * 100 : 0}
-            sx={{
-              height: 6,
-              borderRadius: 3,
-              bgcolor: "action.disabledBackground",
-              "& .MuiLinearProgress-bar": { bgcolor: myTeam.color, borderRadius: 3 },
-            }}
-          />
-
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
-            {Boolean(event.reserveSlotPrice) && (
-              <Chip
-                size="small"
-                color={myBidCap < myTeam.purseRemaining ? "warning" : "default"}
-                variant="outlined"
-                label={`Max safe bid: ${formatAmount(Number.isFinite(myBidCap) ? myBidCap : myTeam.purseRemaining)}`}
-              />
-            )}
-            {genderTotals.female > 0 && (
-              <Chip
-                size="small"
-                variant="outlined"
-                color={myRosterCounts.female >= womenQuota.max ? "error" : "default"}
-                label={`Women ${myRosterCounts.female}/${womenQuota.max}`}
-              />
-            )}
-            {genderTotals.male > 0 && (
-              <Chip
-                size="small"
-                variant="outlined"
-                color={myRosterCounts.male >= menQuota.max ? "error" : "default"}
-                label={`Men ${myRosterCounts.male}/${menQuota.max}`}
-              />
-            )}
-          </Stack>
-
-          <Button
-            size="small"
-            onClick={() => setRosterOpen((o) => !o)}
-            endIcon={rosterOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            sx={{ mt: 1.5 }}
-          >
-            My roster ({myRoster.length})
-          </Button>
-          <Collapse in={rosterOpen}>
-            {myRoster.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ px: 1, pb: 1 }}>
-                No players won yet.
-              </Typography>
-            ) : (
-              <List dense disablePadding>
-                {myRoster.map((p) => (
-                  <ListItem key={p.id} disableGutters>
-                    <ListItemAvatar>
-                      <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
-                    </ListItemAvatar>
-                    <ListItemText primary={p.name} secondary={`Bought for ${formatAmount(p.soldPrice)}`} />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Collapse>
-        </Paper>
-      )}
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Box sx={{ mb: 2 }}>
-        <PlayerOnBlockCard
-          player={room.currentPlayer}
-          currentPrice={room.state?.currentPrice}
-          highBidTeam={room.highBidTeam}
-          sportNames={sportNames}
-          basePrice={room.currentPlayer ? room.state?.basePrice : null}
-          deadlineAt={room.state?.blockDeadlineAt}
-          timerSeconds={room.state?.bidTimerSeconds}
-          biddingOpen={biddingOpen}
-        />
-      </Box>
-
-      {room.currentPlayer && bids.length > 0 && (
-        <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-            Bid history
-          </Typography>
-          <BidHistoryList bids={bids} teams={room.teams} dense />
-        </Paper>
-      )}
-
-      <motion.div whileTap={canBid ? { scale: 0.97 } : undefined}>
-        <Button
-          fullWidth
-          size="large"
-          variant="contained"
-          disabled={!canBid || bidding}
-          onClick={handleBid}
-          sx={{ py: 2, fontSize: 20 }}
-        >
-          {alreadyHighBidder
-            ? "You're leading"
-            : !isLive
-            ? "Waiting for auction"
-            : !biddingOpen
-            ? "Waiting for organizer to start bidding"
-            : genderCapped
-            ? "Your squad is full for this gender"
-            : !canAffordPurse
-            ? "Insufficient purse"
-            : !withinReserveCap
-            ? "Over your reserve-safe limit"
-            : `Bid ${formatAmount(proposedPrice)}`}
-        </Button>
-      </motion.div>
-
-      {alreadyHighBidder && myTeam && (
-        <Button
-          fullWidth
-          size="small"
-          color="error"
-          disabled={myTeam.bidWithdrawUsed || withdrawing}
-          onClick={handleWithdrawBid}
-          sx={{ mt: 1 }}
-        >
-          {myTeam.bidWithdrawUsed
-            ? "Bid withdrawal already used for this auction"
-            : withdrawing
-            ? "Withdrawing..."
-            : "Withdraw my bid (one-time use)"}
-        </Button>
-      )}
-
-      {myTeam && (
-        <Paper variant="outlined" sx={{ p: 2, mb: 3, mt: 3 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} flexWrap="wrap" useFlexGap>
-            <Box>
-              <Typography variant="subtitle1" fontWeight={700}>
-                Swap a player
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {myTeam.swapUsed
-                  ? "You've used your one swap for this auction."
-                  : "Offer any team a price for one of their players -- one use per team, any time."}
-              </Typography>
-            </Box>
-            <Button
-              variant="outlined"
-              startIcon={<SwapHorizIcon />}
-              disabled={!canOfferSwap}
-              onClick={() => setSwapDialogOpen(true)}
-            >
-              Swap a player
-            </Button>
-          </Stack>
-
-          {swapActionError && (
-            <Alert severity="error" sx={{ mt: 2 }} onClose={() => setSwapActionError(null)}>
-              {swapActionError}
+      <Grid container spacing={3}>
+        {/* Main column -- the live auction itself: who's up, the bid history, and the Bid button.
+            A two-column desktop layout keeps this front and center next to the sidebar instead of
+            stretching a single narrow column across a near-empty wide page; on mobile (xs=12 both
+            sides) it's the exact same single stacked column as before, main content first. */}
+        <Grid item xs={12} md={7}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
             </Alert>
           )}
 
-          {myOutgoingSwap &&
-            (() => {
-              const player = room.players.find((p) => p.id === myOutgoingSwap.playerId);
-              const targetTeam = room.teams.find((t) => t.id === myOutgoingSwap.targetTeamId);
-              return (
-                <Alert
-                  severity={myOutgoingSwap.status === "accepted" ? "success" : "info"}
-                  sx={{ mt: 2 }}
-                  action={
-                    myOutgoingSwap.status === "pending" && (
-                      <Button color="inherit" size="small" onClick={() => handleCancelSwap(myOutgoingSwap.id)}>
-                        Withdraw
-                      </Button>
-                    )
-                  }
-                >
-                  {myOutgoingSwap.status === "accepted"
-                    ? `${targetTeam?.name || "They"} agreed to your offer of ${formatAmount(myOutgoingSwap.price)} for ${player?.name || "that player"} -- waiting for the organizer to confirm it.`
-                    : `Waiting for ${targetTeam?.name || "the other team"} to respond to your offer of ${formatAmount(myOutgoingSwap.price)} for ${player?.name || "that player"}.`}
-                </Alert>
-              );
-            })()}
+          <Box sx={{ mb: 2 }}>
+            <PlayerOnBlockCard
+              player={room.currentPlayer}
+              currentPrice={room.state?.currentPrice}
+              highBidTeam={room.highBidTeam}
+              sportNames={sportNames}
+              basePrice={room.currentPlayer ? room.state?.basePrice : null}
+              deadlineAt={room.state?.blockDeadlineAt}
+              timerSeconds={room.state?.bidTimerSeconds}
+              biddingOpen={biddingOpen}
+            />
+          </Box>
 
-          {incomingSwaps.map((req) => {
-            const player = room.players.find((p) => p.id === req.playerId);
-            const fromTeam = room.teams.find((t) => t.id === req.requesterTeamId);
-            return (
-              <Alert
-                key={req.id}
-                severity="warning"
-                sx={{ mt: 2 }}
-                action={
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      color="inherit"
-                      size="small"
-                      disabled={respondingId === req.id}
-                      onClick={() => handleRespondSwap(req.id, false)}
-                    >
-                      Decline
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      disabled={respondingId === req.id}
-                      onClick={() => handleRespondSwap(req.id, true)}
-                    >
-                      Accept
-                    </Button>
-                  </Stack>
-                }
+          {room.currentPlayer && bids.length > 0 && (
+            <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                Bid history
+              </Typography>
+              <BidHistoryList bids={bids} teams={room.teams} dense />
+            </Paper>
+          )}
+
+          <motion.div whileTap={canBid ? { scale: 0.97 } : undefined}>
+            <Button
+              fullWidth
+              size="large"
+              variant="contained"
+              disabled={!canBid || bidding}
+              onClick={handleBid}
+              sx={{ py: 2, fontSize: 20 }}
+            >
+              {alreadyHighBidder
+                ? "You're leading"
+                : !isLive
+                ? "Waiting for auction"
+                : !biddingOpen
+                ? "Waiting for organizer to start bidding"
+                : genderCapped
+                ? "Your squad is full for this gender"
+                : !canAffordPurse
+                ? "Insufficient purse"
+                : !withinReserveCap
+                ? "Over your reserve-safe limit"
+                : `Bid ${formatAmount(proposedPrice)}`}
+            </Button>
+          </motion.div>
+
+          {alreadyHighBidder && myTeam && (
+            <Button
+              fullWidth
+              size="small"
+              color="error"
+              disabled={myTeam.bidWithdrawUsed || withdrawing}
+              onClick={handleWithdrawBid}
+              sx={{ mt: 1 }}
+            >
+              {myTeam.bidWithdrawUsed
+                ? "Bid withdrawal already used for this auction"
+                : withdrawing
+                ? "Withdrawing..."
+                : "Withdraw my bid (one-time use)"}
+            </Button>
+          )}
+        </Grid>
+
+        {/* Sidebar -- status and secondary actions: my purse/quota snapshot, swapping a player, and
+            the collapsible team/sold/unsold reference lists. */}
+        <Grid item xs={12} md={5}>
+          {myTeam && (
+            <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+              <Stack direction="row" spacing={2} sx={{ mb: 1.5 }}>
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Spent
+                  </Typography>
+                  <Typography variant="h6">{formatAmount(mySpent)}</Typography>
+                </Box>
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Remaining
+                  </Typography>
+                  <Typography variant="h6">{formatAmount(myTeam.purseRemaining)}</Typography>
+                </Box>
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Total purse
+                  </Typography>
+                  <Typography variant="h6">{formatAmount(myTeam.purseTotal)}</Typography>
+                </Box>
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={myTeam.purseTotal ? (myTeam.purseRemaining / myTeam.purseTotal) * 100 : 0}
+                sx={{
+                  height: 6,
+                  borderRadius: 3,
+                  bgcolor: "action.disabledBackground",
+                  "& .MuiLinearProgress-bar": { bgcolor: myTeam.color, borderRadius: 3 },
+                }}
+              />
+
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+                {Boolean(event.reserveSlotPrice) && (
+                  <Chip
+                    size="small"
+                    color={myBidCap < myTeam.purseRemaining ? "warning" : "default"}
+                    variant="outlined"
+                    label={`Max safe bid: ${formatAmount(Number.isFinite(myBidCap) ? myBidCap : myTeam.purseRemaining)}`}
+                  />
+                )}
+                {genderTotals.female > 0 && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={myRosterCounts.female >= womenQuota.max ? "error" : "default"}
+                    label={`Women ${myRosterCounts.female}/${womenQuota.max}`}
+                  />
+                )}
+                {genderTotals.male > 0 && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={myRosterCounts.male >= menQuota.max ? "error" : "default"}
+                    label={`Men ${myRosterCounts.male}/${menQuota.max}`}
+                  />
+                )}
+              </Stack>
+
+              <Button
+                size="small"
+                onClick={() => setRosterOpen((o) => !o)}
+                endIcon={rosterOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                sx={{ mt: 1.5 }}
               >
-                {fromTeam?.name || "Another team"} wants to buy {player?.name || "this player"} from you for{" "}
-                {formatAmount(req.price)}.
-              </Alert>
-            );
-          })}
-        </Paper>
-      )}
+                My roster ({myRoster.length})
+              </Button>
+              <Collapse in={rosterOpen}>
+                {myRoster.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ px: 1, pb: 1 }}>
+                    No players won yet.
+                  </Typography>
+                ) : (
+                  <List dense disablePadding>
+                    {myRoster.map((p) => (
+                      <ListItem key={p.id} disableGutters>
+                        <ListItemAvatar>
+                          <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
+                        </ListItemAvatar>
+                        <ListItemText primary={p.name} secondary={`Bought for ${formatAmount(p.soldPrice)}`} />
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Collapse>
+            </Paper>
+          )}
 
-      <SwapRequestDialog
-        open={swapDialogOpen}
-        onClose={() => setSwapDialogOpen(false)}
-        myTeam={myTeam}
-        teams={room.teams}
-        otherTeamPlayers={otherTeamPlayers}
-        onSubmit={handleSendSwap}
-      />
+          {myTeam && (
+            <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} flexWrap="wrap" useFlexGap>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Swap a player
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {myTeam.swapUsed
+                      ? "You've used your one swap for this auction."
+                      : "Offer any team a price for one of their players -- one use per team, any time."}
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  startIcon={<SwapHorizIcon />}
+                  disabled={!canOfferSwap}
+                  onClick={() => setSwapDialogOpen(true)}
+                >
+                  Swap a player
+                </Button>
+              </Stack>
 
-      <Divider sx={{ my: 3 }} />
+              {swapActionError && (
+                <Alert severity="error" sx={{ mt: 2 }} onClose={() => setSwapActionError(null)}>
+                  {swapActionError}
+                </Alert>
+              )}
 
-      <Button
-        size="small"
-        onClick={() => setTeamsOpen((o) => !o)}
-        endIcon={teamsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        sx={{ mb: 1 }}
-      >
-        All teams' purses
-      </Button>
-      <Collapse in={teamsOpen}>
-        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-          <TeamPurseList teams={room.teams} highlightTeamId={teamRep.teamId} players={room.players} />
-        </Paper>
-      </Collapse>
+              {myOutgoingSwap &&
+                (() => {
+                  const player = room.players.find((p) => p.id === myOutgoingSwap.playerId);
+                  const targetTeam = room.teams.find((t) => t.id === myOutgoingSwap.targetTeamId);
+                  return (
+                    <Alert
+                      severity={myOutgoingSwap.status === "accepted" ? "success" : "info"}
+                      sx={{ mt: 2 }}
+                      action={
+                        myOutgoingSwap.status === "pending" && (
+                          <Button color="inherit" size="small" onClick={() => handleCancelSwap(myOutgoingSwap.id)}>
+                            Withdraw
+                          </Button>
+                        )
+                      }
+                    >
+                      {myOutgoingSwap.status === "accepted"
+                        ? `${targetTeam?.name || "They"} agreed to your offer of ${formatAmount(myOutgoingSwap.price)} for ${player?.name || "that player"} -- waiting for the organizer to confirm it.`
+                        : `Waiting for ${targetTeam?.name || "the other team"} to respond to your offer of ${formatAmount(myOutgoingSwap.price)} for ${player?.name || "that player"}.`}
+                    </Alert>
+                  );
+                })()}
 
-      <Button
-        size="small"
-        onClick={() => setSoldOpen((o) => !o)}
-        endIcon={soldOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        sx={{ mb: 1 }}
-      >
-        Sold players ({room.soldPlayers.length})
-      </Button>
-      <Collapse in={soldOpen}>
-        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-          {room.soldPlayers.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              No players sold yet.
-            </Typography>
-          ) : (
-            <Box sx={{ maxHeight: 420, overflowY: "auto" }}>
-              {room.teams
-                .map((team) => ({ team, players: room.soldPlayers.filter((p) => p.soldTeamId === team.id) }))
-                .filter((g) => g.players.length > 0)
-                .concat(
-                  (() => {
-                    const orphaned = room.soldPlayers.filter((p) => !room.teams.some((t) => t.id === p.soldTeamId));
-                    return orphaned.length ? [{ team: null, players: orphaned }] : [];
-                  })()
-                )
-                .map(({ team, players: teamPlayers }) => (
-                  <Box
-                    key={team?.id || "unknown"}
-                    data-testid={`sold-group-${team?.id || "unknown"}`}
-                    sx={{ mb: 1.5, "&:last-child": { mb: 0 } }}
+              {incomingSwaps.map((req) => {
+                const player = room.players.find((p) => p.id === req.playerId);
+                const fromTeam = room.teams.find((t) => t.id === req.requesterTeamId);
+                return (
+                  <Alert
+                    key={req.id}
+                    severity="warning"
+                    sx={{ mt: 2 }}
+                    action={
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          color="inherit"
+                          size="small"
+                          disabled={respondingId === req.id}
+                          onClick={() => handleRespondSwap(req.id, false)}
+                        >
+                          Decline
+                        </Button>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          disabled={respondingId === req.id}
+                          onClick={() => handleRespondSwap(req.id, true)}
+                        >
+                          Accept
+                        </Button>
+                      </Stack>
+                    }
                   >
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.5, py: 0.5 }}>
-                      <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: team?.color || "grey.400", flexShrink: 0 }} />
-                      <Typography variant="subtitle2" fontWeight={700}>
-                        {team?.name || "Unknown team"} ({teamPlayers.length})
-                      </Typography>
-                    </Stack>
-                    <List dense disablePadding>
-                      {teamPlayers.map((p) => (
-                        <ListItem key={p.id} disableGutters sx={{ pl: 2 }}>
-                          <ListItemAvatar>
-                            <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
-                          </ListItemAvatar>
-                          <ListItemText primary={p.name} secondary={formatAmount(p.soldPrice)} />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Box>
-                ))}
-            </Box>
+                    {fromTeam?.name || "Another team"} wants to buy {player?.name || "this player"} from you for{" "}
+                    {formatAmount(req.price)}.
+                  </Alert>
+                );
+              })}
+            </Paper>
           )}
-        </Paper>
-      </Collapse>
 
-      <Button
-        size="small"
-        onClick={() => setUnsoldOpen((o) => !o)}
-        endIcon={unsoldOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        sx={{ mb: 1 }}
-      >
-        Unsold players ({room.unsoldPlayers.length})
-      </Button>
-      <Collapse in={unsoldOpen}>
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          {room.unsoldPlayers.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              No unsold players.
-            </Typography>
-          ) : (
-            <List dense disablePadding sx={{ maxHeight: 320, overflowY: "auto" }}>
-              {room.unsoldPlayers.map((p) => (
-                <ListItem key={p.id} disableGutters>
-                  <ListItemAvatar>
-                    <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
-                  </ListItemAvatar>
-                  <ListItemText primary={p.name} secondary={`Base price ${formatAmount(p.basePrice)}`} />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </Paper>
-      </Collapse>
+          <SwapRequestDialog
+            open={swapDialogOpen}
+            onClose={() => setSwapDialogOpen(false)}
+            myTeam={myTeam}
+            teams={room.teams}
+            otherTeamPlayers={otherTeamPlayers}
+            onSubmit={handleSendSwap}
+          />
+
+          <Divider sx={{ my: 3 }} />
+
+          <Button
+            size="small"
+            onClick={() => setTeamsOpen((o) => !o)}
+            endIcon={teamsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ mb: 1 }}
+          >
+            All teams' purses
+          </Button>
+          <Collapse in={teamsOpen}>
+            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+              <TeamPurseList teams={room.teams} highlightTeamId={teamRep.teamId} players={room.players} />
+            </Paper>
+          </Collapse>
+
+          <Button
+            size="small"
+            onClick={() => setSoldOpen((o) => !o)}
+            endIcon={soldOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ mb: 1 }}
+          >
+            Sold players ({room.soldPlayers.length})
+          </Button>
+          <Collapse in={soldOpen}>
+            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+              {room.soldPlayers.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No players sold yet.
+                </Typography>
+              ) : (
+                <Box sx={{ maxHeight: 420, overflowY: "auto" }}>
+                  {room.teams
+                    .map((team) => ({ team, players: room.soldPlayers.filter((p) => p.soldTeamId === team.id) }))
+                    .filter((g) => g.players.length > 0)
+                    .concat(
+                      (() => {
+                        const orphaned = room.soldPlayers.filter((p) => !room.teams.some((t) => t.id === p.soldTeamId));
+                        return orphaned.length ? [{ team: null, players: orphaned }] : [];
+                      })()
+                    )
+                    .map(({ team, players: teamPlayers }) => (
+                      <Box
+                        key={team?.id || "unknown"}
+                        data-testid={`sold-group-${team?.id || "unknown"}`}
+                        sx={{ mb: 1.5, "&:last-child": { mb: 0 } }}
+                      >
+                        <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.5, py: 0.5 }}>
+                          <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: team?.color || "grey.400", flexShrink: 0 }} />
+                          <Typography variant="subtitle2" fontWeight={700}>
+                            {team?.name || "Unknown team"} ({teamPlayers.length})
+                          </Typography>
+                        </Stack>
+                        <List dense disablePadding>
+                          {teamPlayers.map((p) => (
+                            <ListItem key={p.id} disableGutters sx={{ pl: 2 }}>
+                              <ListItemAvatar>
+                                <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
+                              </ListItemAvatar>
+                              <ListItemText primary={p.name} secondary={formatAmount(p.soldPrice)} />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Box>
+                    ))}
+                </Box>
+              )}
+            </Paper>
+          </Collapse>
+
+          <Button
+            size="small"
+            onClick={() => setUnsoldOpen((o) => !o)}
+            endIcon={unsoldOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ mb: 1 }}
+          >
+            Unsold players ({room.unsoldPlayers.length})
+          </Button>
+          <Collapse in={unsoldOpen}>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              {room.unsoldPlayers.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No unsold players.
+                </Typography>
+              ) : (
+                <List dense disablePadding sx={{ maxHeight: 320, overflowY: "auto" }}>
+                  {room.unsoldPlayers.map((p) => (
+                    <ListItem key={p.id} disableGutters>
+                      <ListItemAvatar>
+                        <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
+                      </ListItemAvatar>
+                      <ListItemText primary={p.name} secondary={`Base price ${formatAmount(p.basePrice)}`} />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Paper>
+          </Collapse>
+        </Grid>
+      </Grid>
     </Container>
   );
 }
