@@ -295,6 +295,23 @@ export async function resetTeamBidWithdrawUsed(eventId, teamId) {
   await updateDoc(doc(db, "events", eventId, "teams", teamId), { bidWithdrawUsed: false });
 }
 
+// Same reset, for every team at once -- handy before a fresh auction round instead of clicking
+// through each team's chips one by one. Only touches teams that actually used one or the other,
+// so it's a no-op write-wise for teams that never did. Batched in chunks of 450 to stay under
+// Firestore's 500-write-per-batch limit for very large team counts.
+export async function resetAllTeamsLimits(eventId, teams) {
+  const toReset = teams.filter((t) => t.swapUsed || t.bidWithdrawUsed);
+  const chunkSize = 450;
+  for (let i = 0; i < toReset.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    for (const team of toReset.slice(i, i + chunkSize)) {
+      batch.update(doc(db, "events", eventId, "teams", team.id), { swapUsed: false, bidWithdrawUsed: false });
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await batch.commit();
+  }
+}
+
 async function assertTeamHasNoSoldPlayers(eventId, teamId) {
   const soldSnap = await getDocs(
     query(collection(db, "events", eventId, "players"), where("soldTeamId", "==", teamId), limit(1))

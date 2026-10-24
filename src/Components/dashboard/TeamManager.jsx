@@ -35,6 +35,7 @@ import {
   deleteTeam,
   getTeamOwners,
   randomDigits,
+  resetAllTeamsLimits,
   resetTeamBidWithdrawUsed,
   resetTeamSwapUsed,
   restoreTeam,
@@ -58,7 +59,7 @@ const DEFAULT_COLORS = ["#e53935", "#1e88e5", "#43a047", "#fb8c00", "#8e24aa", "
 let ownerCounter = 0;
 const blankOwner = () => ({ id: `new${Date.now()}-${ownerCounter++}`, name: "", gender: "", contact: "" });
 
-function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave }) {
+function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave, onResetSwap, onResetBidWithdraw }) {
   const [form, setForm] = useState({ name: "", purseTotal: 0, color: "#6366f1", owners: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -72,7 +73,13 @@ function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave }) {
     } else {
       setForm({ name: "", purseTotal: defaultPurse ?? 0, color: DEFAULT_COLORS[colorIndex % DEFAULT_COLORS.length], owners: [blankOwner()] });
     }
-  }, [open, team, defaultPurse, colorIndex]);
+    // Keyed on team?.id, not the whole `team` object -- the parent now resolves it live against
+    // the teams list (so the swap/withdraw "used" chips below update in place after a reset)
+    // instead of a snapshot taken when the dialog opened, and that live object gets a new
+    // reference on every unrelated team update. Resetting the form on every one of those would
+    // wipe out whatever the organizer is mid-typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, team?.id, defaultPurse, colorIndex]);
 
   const setOwner = (id, key, value) =>
     setForm((f) => ({ ...f, owners: f.owners.map((o) => (o.id === id ? { ...o, [key]: value } : o)) }));
@@ -173,6 +180,42 @@ function TeamDialog({ open, team, defaultPurse, colorIndex, onClose, onSave }) {
               Add owner / captain
             </Button>
           </Box>
+
+          {team && (team.swapUsed || team.bidWithdrawUsed) && (
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                One-time limits used
+              </Typography>
+              <Stack spacing={1}>
+                {team.swapUsed && (
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ p: 1, borderRadius: 1, bgcolor: "action.hover" }}
+                  >
+                    <Typography variant="body2">Swap a player</Typography>
+                    <Button size="small" startIcon={<AutorenewIcon fontSize="small" />} onClick={() => onResetSwap(team)}>
+                      Reset
+                    </Button>
+                  </Stack>
+                )}
+                {team.bidWithdrawUsed && (
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ p: 1, borderRadius: 1, bgcolor: "action.hover" }}
+                  >
+                    <Typography variant="body2">Bid withdrawal</Typography>
+                    <Button size="small" startIcon={<AutorenewIcon fontSize="small" />} onClick={() => onResetBidWithdraw(team)}>
+                      Reset
+                    </Button>
+                  </Stack>
+                )}
+              </Stack>
+            </Box>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -194,6 +237,7 @@ export default function TeamManager() {
   const [deletedTeams, setDeletedTeams] = useState([]);
   const [dialog, setDialog] = useState({ open: false, team: null });
   const [deleteError, setDeleteError] = useState(null);
+  const [resettingAll, setResettingAll] = useState(false);
 
   useEffect(() => {
     const unsubEvent = subscribeToEvent(eventId, setEvent);
@@ -269,10 +313,29 @@ export default function TeamManager() {
     if (ok) await resetTeamBidWithdrawUsed(eventId, team.id);
   }
 
+  async function handleResetAllLimits() {
+    const ok = await confirm({
+      title: "Reset swap & withdraw for every team?",
+      description: "Gives every team back their one-time swap-a-player offer and bid withdrawal, as if nobody had used either yet.",
+      confirmLabel: "Reset for all teams",
+    });
+    if (!ok) return;
+    setDeleteError(null);
+    setResettingAll(true);
+    try {
+      await resetAllTeamsLimits(eventId, teams);
+    } catch (err) {
+      setDeleteError(friendlyErrorMessage(err));
+    } finally {
+      setResettingAll(false);
+    }
+  }
+
   if (!teams || !event) return <LoadingSpinner />;
 
   const totalPurseRemaining = teams.reduce((sum, t) => sum + (t.purseRemaining || 0), 0);
   const totalPurse = teams.reduce((sum, t) => sum + (t.purseTotal || 0), 0);
+  const anyLimitsUsed = teams.some((t) => t.swapUsed || t.bidWithdrawUsed);
 
   return (
     <Box>
@@ -295,9 +358,21 @@ export default function TeamManager() {
       />
 
       {teams.length > 0 && (
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center" sx={{ mb: 2 }}>
           <Chip label={`${teams.length} team${teams.length === 1 ? "" : "s"}`} size="small" variant="outlined" />
           <Chip label={`Purse remaining ${formatAmount(totalPurseRemaining)} / ${formatAmount(totalPurse)}`} size="small" variant="outlined" color="primary" />
+          {anyLimitsUsed && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              startIcon={<AutorenewIcon fontSize="small" />}
+              disabled={resettingAll}
+              onClick={handleResetAllLimits}
+            >
+              {resettingAll ? "Resetting..." : "Reset swap & withdraw for all teams"}
+            </Button>
+          )}
         </Stack>
       )}
 
@@ -455,11 +530,13 @@ export default function TeamManager() {
 
       <TeamDialog
         open={dialog.open}
-        team={dialog.team}
+        team={dialog.team ? teams.find((t) => t.id === dialog.team.id) || dialog.team : null}
         defaultPurse={event.purseDefault}
         colorIndex={teams.length}
         onClose={() => setDialog({ open: false, team: null })}
         onSave={handleSave}
+        onResetSwap={handleResetSwap}
+        onResetBidWithdraw={handleResetBidWithdraw}
       />
     </Box>
   );
