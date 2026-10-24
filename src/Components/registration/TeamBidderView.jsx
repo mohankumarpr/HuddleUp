@@ -493,8 +493,78 @@ export default function TeamBidderView() {
         </Paper>
       )}
 
-      {myTeam && (
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      <Box sx={{ mb: 2 }}>
+        <PlayerOnBlockCard
+          player={room.currentPlayer}
+          currentPrice={room.state?.currentPrice}
+          highBidTeam={room.highBidTeam}
+          sportNames={sportNames}
+          basePrice={room.currentPlayer ? room.state?.basePrice : null}
+          deadlineAt={room.state?.blockDeadlineAt}
+          timerSeconds={room.state?.bidTimerSeconds}
+          biddingOpen={biddingOpen}
+        />
+      </Box>
+
+      {room.currentPlayer && bids.length > 0 && (
         <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+            Bid history
+          </Typography>
+          <BidHistoryList bids={bids} teams={room.teams} dense />
+        </Paper>
+      )}
+
+      <motion.div whileTap={canBid ? { scale: 0.97 } : undefined}>
+        <Button
+          fullWidth
+          size="large"
+          variant="contained"
+          disabled={!canBid || bidding}
+          onClick={handleBid}
+          sx={{ py: 2, fontSize: 20 }}
+        >
+          {alreadyHighBidder
+            ? "You're leading"
+            : !isLive
+            ? "Waiting for auction"
+            : !biddingOpen
+            ? "Waiting for organizer to start bidding"
+            : genderCapped
+            ? "Your squad is full for this gender"
+            : !canAffordPurse
+            ? "Insufficient purse"
+            : !withinReserveCap
+            ? "Over your reserve-safe limit"
+            : `Bid ${formatAmount(proposedPrice)}`}
+        </Button>
+      </motion.div>
+
+      {alreadyHighBidder && myTeam && (
+        <Button
+          fullWidth
+          size="small"
+          color="error"
+          disabled={myTeam.bidWithdrawUsed || withdrawing}
+          onClick={handleWithdrawBid}
+          sx={{ mt: 1 }}
+        >
+          {myTeam.bidWithdrawUsed
+            ? "Bid withdrawal already used for this auction"
+            : withdrawing
+            ? "Withdrawing..."
+            : "Withdraw my bid (one-time use)"}
+        </Button>
+      )}
+
+      {myTeam && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 3, mt: 3 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} flexWrap="wrap" useFlexGap>
             <Box>
               <Typography variant="subtitle1" fontWeight={700}>
@@ -590,76 +660,6 @@ export default function TeamBidderView() {
         otherTeamPlayers={otherTeamPlayers}
         onSubmit={handleSendSwap}
       />
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Box sx={{ mb: 2 }}>
-        <PlayerOnBlockCard
-          player={room.currentPlayer}
-          currentPrice={room.state?.currentPrice}
-          highBidTeam={room.highBidTeam}
-          sportNames={sportNames}
-          basePrice={room.currentPlayer ? room.state?.basePrice : null}
-          deadlineAt={room.state?.blockDeadlineAt}
-          timerSeconds={room.state?.bidTimerSeconds}
-          biddingOpen={biddingOpen}
-        />
-      </Box>
-
-      {room.currentPlayer && bids.length > 0 && (
-        <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-            Bid history
-          </Typography>
-          <BidHistoryList bids={bids} teams={room.teams} dense />
-        </Paper>
-      )}
-
-      <motion.div whileTap={canBid ? { scale: 0.97 } : undefined}>
-        <Button
-          fullWidth
-          size="large"
-          variant="contained"
-          disabled={!canBid || bidding}
-          onClick={handleBid}
-          sx={{ py: 2, fontSize: 20 }}
-        >
-          {alreadyHighBidder
-            ? "You're leading"
-            : !isLive
-            ? "Waiting for auction"
-            : !biddingOpen
-            ? "Waiting for organizer to start bidding"
-            : genderCapped
-            ? "Your squad is full for this gender"
-            : !canAffordPurse
-            ? "Insufficient purse"
-            : !withinReserveCap
-            ? "Over your reserve-safe limit"
-            : `Bid ${formatAmount(proposedPrice)}`}
-        </Button>
-      </motion.div>
-
-      {alreadyHighBidder && myTeam && (
-        <Button
-          fullWidth
-          size="small"
-          color="error"
-          disabled={myTeam.bidWithdrawUsed || withdrawing}
-          onClick={handleWithdrawBid}
-          sx={{ mt: 1 }}
-        >
-          {myTeam.bidWithdrawUsed
-            ? "Bid withdrawal already used for this auction"
-            : withdrawing
-            ? "Withdrawing..."
-            : "Withdraw my bid (one-time use)"}
-        </Button>
-      )}
 
       <Divider sx={{ my: 3 }} />
 
