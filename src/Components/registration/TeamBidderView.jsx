@@ -29,6 +29,8 @@ import { motion } from "framer-motion";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import DownloadIcon from "@mui/icons-material/Download";
+import ShareIcon from "@mui/icons-material/Share";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { useNavigationGuard } from "../../context/NavigationGuardContext";
@@ -59,6 +61,8 @@ import BidHistoryList from "../common/BidHistoryList";
 import SoundToggleButton from "../common/SoundToggleButton";
 import TeamPurseList from "../common/TeamPurseList";
 import AmountField from "../common/AmountField";
+import ShareSoldDialog from "../common/ShareSoldDialog";
+import { downloadTextFile, toCsv } from "../../utils/download";
 import LoadingSpinner from "../LoadingSpinner";
 
 // Offer another team a price for one of their already-sold players. If they accept, the organizer
@@ -164,6 +168,7 @@ export default function TeamBidderView() {
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [swapActionError, setSwapActionError] = useState(null);
   const [respondingId, setRespondingId] = useState(null);
+  const [rosterShareMsg, setRosterShareMsg] = useState(null);
 
   // Resolves the slug to an event ID once, then switches to a live subscription -- a one-time
   // fetch here would freeze this screen's event data (reserveSlotPrice, purseDefault, etc.) at
@@ -265,6 +270,26 @@ export default function TeamBidderView() {
     if (notify && room.soundEnabled) playSwapSound();
     swapSeenRef.current = next;
   }, [swapRequests, teamRep?.teamId, room.soundEnabled]);
+
+  // The moment the organizer confirms a sale to this rep's own team, pop up the same "Sold!"
+  // share card the organizer sees -- a team just won a player is exactly the moment they'd want
+  // to post it. Seeded silently on the first snapshot so reopening the tab mid-auction doesn't
+  // replay a card for a player bought earlier.
+  const [myShareCard, setMyShareCard] = useState(null);
+  const mySoldSeenRef = useRef(null);
+  useEffect(() => {
+    const myTeamId = teamRep?.teamId;
+    if (!myTeamId) return;
+    const mine = room.players.filter((p) => p.status === "sold" && p.soldTeamId === myTeamId);
+    const ids = new Set(mine.map((p) => p.id));
+    if (mySoldSeenRef.current === null) {
+      mySoldSeenRef.current = ids;
+      return;
+    }
+    const newlySold = mine.find((p) => !mySoldSeenRef.current.has(p.id));
+    if (newlySold) setMyShareCard(newlySold);
+    mySoldSeenRef.current = ids;
+  }, [room.players, teamRep?.teamId]);
 
   function sportNames(sportIds) {
     return (sportIds || []).map((id) => sports.find((s) => s.id === id)?.name).filter(Boolean).join(", ");
@@ -387,6 +412,37 @@ export default function TeamBidderView() {
     } finally {
       setRespondingId(null);
     }
+  }
+
+  function buildRosterShareText() {
+    const lines = myRoster.map((p) => `${p.name} — ${formatAmount(p.soldPrice)}`);
+    return `${myTeam?.name || "My team"}'s roster — ${event.name}\n\n${lines.join("\n")}\n\nTotal spent: ${formatAmount(mySpent)}`;
+  }
+
+  async function handleShareRoster() {
+    setRosterShareMsg(null);
+    const text = buildRosterShareText();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${myTeam?.name || "My team"}'s roster`, text });
+      } catch (err) {
+        if (err?.name !== "AbortError") setRosterShareMsg("Couldn't share -- try downloading instead.");
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setRosterShareMsg("Roster copied to clipboard!");
+    } catch {
+      setRosterShareMsg("Couldn't copy -- try downloading instead.");
+    }
+  }
+
+  function handleDownloadRoster() {
+    const rows = myRoster.map((p) => [p.name, p.soldPrice]);
+    const csv = toCsv(["Player", "Price"], rows);
+    const safeName = (myTeam?.name || "team").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    downloadTextFile(`${safeName || "team"}-roster.csv`, csv);
   }
 
   return (
@@ -570,6 +626,21 @@ export default function TeamBidderView() {
                     ))}
                   </List>
                 )}
+                {myRoster.length > 0 && (
+                  <Stack direction="row" spacing={1} sx={{ mt: 1, px: 1 }}>
+                    <Button size="small" variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadRoster}>
+                      Download
+                    </Button>
+                    <Button size="small" variant="outlined" startIcon={<ShareIcon />} onClick={handleShareRoster}>
+                      Share
+                    </Button>
+                  </Stack>
+                )}
+                {rosterShareMsg && (
+                  <Alert severity="info" sx={{ mt: 1 }} onClose={() => setRosterShareMsg(null)}>
+                    {rosterShareMsg}
+                  </Alert>
+                )}
               </Collapse>
             </Paper>
           )}
@@ -670,6 +741,16 @@ export default function TeamBidderView() {
             teams={room.teams}
             otherTeamPlayers={otherTeamPlayers}
             onSubmit={handleSendSwap}
+          />
+
+          <ShareSoldDialog
+            open={Boolean(myShareCard)}
+            onClose={() => setMyShareCard(null)}
+            player={myShareCard}
+            teamName={myTeam?.name}
+            teamColor={myTeam?.color}
+            price={myShareCard?.soldPrice}
+            eventName={event.name}
           />
 
           <Divider sx={{ my: 3 }} />

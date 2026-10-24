@@ -1,6 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Box, Chip, Container, Grid, LinearProgress, Paper, Stack, Typography } from "@mui/material";
+import {
+  Avatar,
+  Box,
+  Chip,
+  Container,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  IconButton,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { motion } from "framer-motion";
 import GavelIcon from "@mui/icons-material/Gavel";
 import { ensureAnonymousAuth } from "../../utils/firebase/auth";
@@ -19,6 +38,7 @@ export default function SpectatorView() {
   const { eventSlug } = useParams();
   const [event, setEvent] = useState(undefined);
   const [sports, setSports] = useState([]);
+  const [rosterTeam, setRosterTeam] = useState(null);
 
   useEffect(() => {
     ensureAnonymousAuth();
@@ -131,9 +151,13 @@ export default function SpectatorView() {
         <Typography variant="h6" sx={{ mt: 6, mb: 2, opacity: 0.9 }}>
           Teams
         </Typography>
+        <Typography variant="caption" sx={{ display: "block", mb: 1.5, color: "grey.400" }}>
+          Tap a team to see who they've bought.
+        </Typography>
         <Grid container spacing={2}>
           {room.teams.map((team, i) => {
             const pct = team.purseTotal ? Math.round((team.purseRemaining / team.purseTotal) * 100) : 0;
+            const rosterSize = room.soldPlayers.filter((p) => p.soldTeamId === team.id).length;
             return (
               <Grid item xs={6} sm={4} key={team.id}>
                 <motion.div
@@ -143,7 +167,16 @@ export default function SpectatorView() {
                 >
                   <Paper
                     variant="outlined"
-                    sx={{ p: 2, bgcolor: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.12)", borderRadius: 2 }}
+                    onClick={() => setRosterTeam(team)}
+                    sx={{
+                      p: 2,
+                      bgcolor: "rgba(255,255,255,0.05)",
+                      borderColor: "rgba(255,255,255,0.12)",
+                      borderRadius: 2,
+                      cursor: "pointer",
+                      transition: "background-color 0.15s",
+                      "&:hover": { bgcolor: "rgba(255,255,255,0.09)" },
+                    }}
                   >
                     <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                       <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: team.color, flexShrink: 0 }} />
@@ -163,7 +196,8 @@ export default function SpectatorView() {
                       }}
                     />
                     <Typography variant="caption" sx={{ color: "grey.400" }}>
-                      {formatAmount(team.purseRemaining)} / {formatAmount(team.purseTotal)}
+                      {formatAmount(team.purseRemaining)} / {formatAmount(team.purseTotal)} · {rosterSize} player
+                      {rosterSize === 1 ? "" : "s"}
                     </Typography>
                   </Paper>
                 </motion.div>
@@ -172,6 +206,52 @@ export default function SpectatorView() {
           })}
         </Grid>
       </Container>
+
+      <Dialog
+        open={Boolean(rosterTeam)}
+        onClose={() => setRosterTeam(null)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { bgcolor: "#161330", color: "#fff", backgroundImage: "none" } }}
+      >
+        {rosterTeam && (
+          <>
+            <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: rosterTeam.color, flexShrink: 0 }} />
+              <Box sx={{ flexGrow: 1 }}>{rosterTeam.name}</Box>
+              <IconButton size="small" onClick={() => setRosterTeam(null)} aria-label="Close" sx={{ color: "grey.400" }}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ pt: 0 }}>
+              {(() => {
+                const roster = room.soldPlayers.filter((p) => p.soldTeamId === rosterTeam.id);
+                return roster.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: "grey.400", py: 2 }}>
+                    No players bought yet.
+                  </Typography>
+                ) : (
+                  <List dense disablePadding sx={{ maxHeight: 420, overflowY: "auto" }}>
+                    {roster.map((p) => (
+                      <ListItem key={p.id} disableGutters sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                        <ListItemAvatar>
+                          <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 36, height: 36 }} />
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={p.name}
+                          primaryTypographyProps={{ sx: { color: "#fff" } }}
+                          secondary={formatAmount(p.soldPrice)}
+                          secondaryTypographyProps={{ sx: { color: "grey.400" } }}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                );
+              })()}
+            </DialogContent>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 }

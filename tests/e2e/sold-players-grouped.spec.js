@@ -83,9 +83,13 @@ test("a bidder's sold-players list is grouped by team, not one flat list", async
       await page.getByRole("button", { name: new RegExp(`^Confirm SOLD to ${teamName}$`) }).click();
       await expect(page.getByText("On the block", { exact: true })).toBeHidden({ timeout: 15000 });
 
-      // Confirming a sale auto-opens a "Share this sale" dialog -- close it before picking the
-      // next player, or it blocks the console behind it.
+      // Confirming a sale auto-opens a "Share this sale" dialog for the organizer, and the same
+      // card for the buying team's own rep (see TeamBidderView.jsx) -- close both, or they block
+      // the console/bidder screen behind them.
       await page.getByRole("button", { name: "Close" }).click();
+      const repShareDialog = repPage.getByRole("dialog").filter({ hasText: "Share this sale" });
+      await expect(repShareDialog).toBeVisible({ timeout: 15000 });
+      await repShareDialog.getByRole("button", { name: "Close" }).click();
     }
 
     // From Team A's own bidding screen: both teams' purchases show up grouped under their own
