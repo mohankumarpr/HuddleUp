@@ -692,19 +692,41 @@ export default function TeamBidderView() {
               No players sold yet.
             </Typography>
           ) : (
-            <List dense disablePadding sx={{ maxHeight: 320, overflowY: "auto" }}>
-              {room.soldPlayers.map((p) => (
-                <ListItem key={p.id} disableGutters>
-                  <ListItemAvatar>
-                    <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={p.name}
-                    secondary={`${room.teams.find((t) => t.id === p.soldTeamId)?.name || "Unknown team"} · ${formatAmount(p.soldPrice)}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
+            <Box sx={{ maxHeight: 420, overflowY: "auto" }}>
+              {room.teams
+                .map((team) => ({ team, players: room.soldPlayers.filter((p) => p.soldTeamId === team.id) }))
+                .filter((g) => g.players.length > 0)
+                .concat(
+                  (() => {
+                    const orphaned = room.soldPlayers.filter((p) => !room.teams.some((t) => t.id === p.soldTeamId));
+                    return orphaned.length ? [{ team: null, players: orphaned }] : [];
+                  })()
+                )
+                .map(({ team, players: teamPlayers }) => (
+                  <Box
+                    key={team?.id || "unknown"}
+                    data-testid={`sold-group-${team?.id || "unknown"}`}
+                    sx={{ mb: 1.5, "&:last-child": { mb: 0 } }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.5, py: 0.5 }}>
+                      <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: team?.color || "grey.400", flexShrink: 0 }} />
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        {team?.name || "Unknown team"} ({teamPlayers.length})
+                      </Typography>
+                    </Stack>
+                    <List dense disablePadding>
+                      {teamPlayers.map((p) => (
+                        <ListItem key={p.id} disableGutters sx={{ pl: 2 }}>
+                          <ListItemAvatar>
+                            <Avatar src={p.photoUrl} alt={p.name} sx={{ width: 32, height: 32 }} />
+                          </ListItemAvatar>
+                          <ListItemText primary={p.name} secondary={formatAmount(p.soldPrice)} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                ))}
+            </Box>
           )}
         </Paper>
       </Collapse>
